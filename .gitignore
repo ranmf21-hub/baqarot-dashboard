@@ -1,0 +1,10 @@
+# סודות — לעולם לא לריפו
+.streamlit/secrets.toml
+
+# נתונים מקומיים — המאגר חי ב-Google Sheets / בתיקייה השיתופית, לא בריפו
+מאגר בקרות*.xlsx
+config.json
+גיבוי מאגר/
+
+__pycache__/
+*.pyc
