@@ -236,10 +236,12 @@ st.markdown("")
 
 # ---------------------------------------------------------------- טאבים
 
-tab_over, tab_manage, tab_ingest, tab_ship, tab_prod = st.tabs(
-    ["📊 סקירה", "📋 ניהול ממצאים", "📥 קליטה בגרירה", "✉️ משלוחים", "📈 תפוקה"])
+tab_over, tab_period, tab_manage, tab_ingest, tab_ship, tab_prod = st.tabs(
+    ["📊 סקירה", "📄 לפי תקופה", "📋 ניהול ממצאים", "📥 קליטה בגרירה", "✉️ משלוחים", "📈 תפוקה"])
 
 PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0b0e13", plot_bgcolor="#0b0e13")
+STATUS_BADGE = {"פתוח": "🟠 פתוח", "נשלח": "🟡 נשלח", "נצפה": "🔵 נצפה",
+                "בטיפול": "🟡 בטיפול", "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
 
 # ---------- סקירה ----------
 with tab_over:
@@ -293,6 +295,45 @@ with tab_over:
                                           "תיאור", "אנליסט", "נשלח בתאריך", "ימים פתוח", "סטטוס"]]
             st.dataframe(lt.sort_values("ימים פתוח", ascending=False),
                          use_container_width=True, hide_index=True)
+
+# ---------- לפי תקופה (בעיות של קובץ מסוים + למי נשלח ומה הסטטוס) ----------
+with tab_period:
+    if f_all.empty:
+        st.info("המאגר ריק — קלוט תחילה ריצה בטאב 'קליטה בגרירה'.")
+    else:
+        periods = sorted(f_all["תקופת בקרה"].unique(), reverse=True)
+        sel = st.selectbox("בחר תקופת בקרה (קובץ) לצפייה:", periods)
+        g = f_all[f_all["תקופת בקרה"] == sel]
+
+        # KPI לתקופה
+        n_err = int((g["סוג ממצא"] == "שגיאת סיווג").sum())
+        n_uom = int((g["סוג ממצא"] == "יחידת מידה").sum())
+        n_open = int((~g["סטטוס"].isin(core.CLOSED_STATUSES)).sum())
+        n_done = int(g["סטטוס"].isin(core.CLOSED_STATUSES).sum())
+        kk = st.columns(4)
+        for col, (v, t, c) in zip(kk, [
+            (len(g), "סה\"כ ממצאים", "blue"), (n_err, "שגיאות סיווג", "red"),
+            (n_uom, "יחידות מידה", "orange"), (f"{n_done}/{len(g)}", "טופלו", "green")]):
+            col.markdown(f"<div class='kpi {c}'><div class='v'>{v}</div><div class='t'>{t}</div></div>",
+                         unsafe_allow_html=True)
+
+        # מבט 1 — למי נשלחו מיילים ומה הסטטוס
+        st.markdown("### ✉️ למי נשלחו מיילים — ומה הסטטוס")
+        pr = core.period_analyst_rows(g)
+        if not pr.empty:
+            st.dataframe(pr, use_container_width=True, hide_index=True,
+                         column_config={"ממצאים": st.column_config.NumberColumn(width="small")})
+        st.markdown("<div class='note'>כל שורה = אנליסט שקיבל מייל על הממצאים שלו בתקופה זו, עם מספר "
+                    "הפריטים, תאריך השליחה, פילוח הסטטוס, ומתי התקבל חיווי.</div>", unsafe_allow_html=True)
+
+        # מבט 2 — הבעיות עצמן של הקובץ
+        st.markdown(f"### 📋 הבעיות שנמצאו בקובץ {sel}")
+        gv = g.copy()
+        gv["מצב"] = gv["סטטוס"].map(STATUS_BADGE).fillna(gv["סטטוס"])
+        cols = ["מצב", "מספר בקשה", "שורה", "מקט", "סוג ממצא", "תיאור",
+                "נמצא", "צפוי", "אנליסט", "נשלח בתאריך", "חיווי בתאריך"]
+        st.dataframe(gv[cols].sort_values(["סוג ממצא", "אנליסט"]),
+                     use_container_width=True, hide_index=True, height=420)
 
 # ---------- ניהול ממצאים ----------
 with tab_manage:

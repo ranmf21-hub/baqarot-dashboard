@@ -6,5 +6,8 @@
 config.json
 גיבוי מאגר/
 
+copy_secrets.py
+_push_log.txt
+
 __pycache__/
 *.pyc

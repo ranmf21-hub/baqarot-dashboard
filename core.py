@@ -569,6 +569,29 @@ def mark_analyst_seen(led: dict, analyst: str, source: str = "ידני") -> int:
     return n
 
 
+def period_analyst_rows(g: pd.DataFrame) -> pd.DataFrame:
+    """לכל אנליסט בתקופה: כתובת שאליה נשלח, כמה ממצאים, מתי נשלח, פילוח סטטוס, מתי התקבל חיווי."""
+    if g.empty:
+        return pd.DataFrame()
+    rows = []
+    for an, sub in g.groupby("אנליסט"):
+        sent = sorted({d for d in sub["נשלח בתאריך"] if d})
+        seen = sorted({d for d in sub["חיווי בתאריך"] if d})
+        emails = sorted({e for e in sub["נמען"] if e})
+        rows.append({
+            "אנליסט": an or "(ללא שם)",
+            "כתובת מייל": emails[0] if emails else "— (לא נשלח)",
+            "ממצאים": len(sub),
+            "נשלח בתאריך": ", ".join(sent) if sent else "טרם נשלח",
+            "פתוח": int((sub["סטטוס"] == "פתוח").sum()),
+            "נשלח": int((sub["סטטוס"] == "נשלח").sum()),
+            "נצפה/בטיפול": int(sub["סטטוס"].isin(["נצפה", "בטיפול"]).sum()),
+            "טופל": int((sub["סטטוס"].isin(["טופל", "לא רלוונטי"])).sum()),
+            "חיווי התקבל": ", ".join(seen) if seen else "—",
+        })
+    return pd.DataFrame(rows).sort_values("ממצאים", ascending=False)
+
+
 def analyst_progress(f_all: pd.DataFrame) -> pd.DataFrame:
     """טבלת מעקב לפי אנליסט: כמה נשלחו/נצפו/טופלו + אחוז סגירה."""
     if f_all.empty:
