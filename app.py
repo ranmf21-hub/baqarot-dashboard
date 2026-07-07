@@ -2,7 +2,7 @@
 """
 לוח בקרת קטלוג — דשבורד ניהול ממצאים
 דף חי לניהול מעגל-הבקרה המלא: קליטת ריצות (בגרירה), מעקב למי נשלח,
-חיווי שנצפה, טיפול וסגירה. עיצוב כהה עם נורות ירוק/כתום/אדום.
+קבלת מענה, בטיפול, טיפול וסגירה. עיצוב כהה עם נורות ירוק/כתום/אדום.
 הרצה:  py -m streamlit run app.py
 """
 import os
@@ -49,7 +49,7 @@ CSS = """
 """
 st.markdown(CSS, unsafe_allow_html=True)
 PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0b0e13", plot_bgcolor="#0b0e13")
-STATUS_BADGE = {"פתוח": "🟠 פתוח", "נשלח": "🟡 נשלח", "נצפה": "🔵 נצפה",
+STATUS_BADGE = {"נשלח": "🟡 נשלח", "התקבל מענה": "🔵 התקבל מענה",
                 "בטיפול": "🟡 בטיפול", "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
 
 
@@ -248,7 +248,7 @@ tab_period, tab_over, tab_manage, tab_ingest, tab_ship, tab_prod = st.tabs(
     ["📄 לפי תקופה", "📊 סקירה", "📋 ניהול ממצאים (הכל)", "📥 קליטה בגרירה", "✉️ משלוחים", "📈 תפוקה"])
 
 # ---------- לפי תקופה — מסך הניהול הראשי, בנוי לפי שלבי התהליך ----------
-# התהליך: פריקת קובץ → מייל נשלח (אוטומטית) → ממתין למענה → התקבל משוב → בטיפול → טופל.
+# התהליך: פריקת קובץ → מייל נשלח (אוטומטית) → ממתין למענה → התקבל מענה (לאימות) → בטיפול → טופל.
 # יחידת הניהול = אנליסט (כל מייל = חבילת ממצאים לאנליסט אחד) — לכן כרטיס לכל אנליסט.
 with tab_period:
     if f_all.empty:
@@ -260,11 +260,12 @@ with tab_period:
         side = g[g["סוג ממצא"].isin(core.SIDE_TYPES)]
         act = g[~g["סוג ממצא"].isin(core.SIDE_TYPES)]   # ממצאים לטיפול בפועל
 
-        # --- שלב 1: איפה התהליך עומד — פס-התקדמות של השלבים ---
-        n_wait = int(act["סטטוס"].isin(["פתוח", "נשלח"]).sum())
-        n_seen = int((act["סטטוס"] == "נצפה").sum())
+        # --- שלב 1: איפה התהליך עומד — פס-התקדמות לפי שלבי התהליך ---
+        n_wait = int((act["סטטוס"] == "נשלח").sum())
+        n_reply = int((act["סטטוס"] == "התקבל מענה").sum())
         n_prog = int((act["סטטוס"] == "בטיפול").sum())
-        n_done = int(act["סטטוס"].isin(core.CLOSED_STATUSES).sum())
+        n_done = int((act["סטטוס"] == "טופל").sum())
+        n_irr = int((act["סטטוס"] == "לא רלוונטי").sum())   # נדחה — לא ממצא אמיתי (נפרד מ'טופל')
         n_late = int(act["באיחור"].sum())
         sent_dates = sorted({d for d in act["נשלח בתאריך"] if d})
 
@@ -272,25 +273,27 @@ with tab_period:
                     f"{len(act)} ממצאים · המיילים נשלחו {sent_dates[0] if sent_dates else '—'} · "
                     f"{act['אנליסט'].nunique()} אנליסטים</div>", unsafe_allow_html=True)
 
-        stages = [(n_wait, "ממתין למענה", "#f59e0b"), (n_seen, "התקבל משוב", "#38bdf8"),
+        # שלבי-התהליך העיקריים (זורמים מימין לשמאל), ואז קופסאות-קצה נפרדות
+        stages = [(n_wait, "ממתין למענה", "#f59e0b"), (n_reply, "התקבל מענה — לבדיקה", "#38bdf8"),
                   (n_prog, "בטיפול", "#eab308"), (n_done, "טופל", "#22c55e")]
-        boxes = []
-        for v, t, c in stages:
-            dim = "opacity:.45;" if v == 0 else ""
-            boxes.append(
-                f"<div style='background:#151a22;border:1px solid #232a35;border-top:4px solid {c};"
-                f"border-radius:12px;padding:10px 22px;text-align:center;min-width:120px;{dim}'>"
-                f"<div style='font-size:28px;font-weight:700;color:{c}'>{v}</div>"
-                f"<div style='font-size:12px;color:#8b93a3'>{t}</div></div>")
+
+        def _box(v, t, c, txt="#8b93a3"):
+            dim = "opacity:.4;" if v == 0 else ""
+            return (f"<div style='background:#151a22;border:1px solid #232a35;border-top:4px solid {c};"
+                    f"border-radius:12px;padding:10px 20px;text-align:center;min-width:112px;{dim}'>"
+                    f"<div style='font-size:28px;font-weight:700;color:{c}'>{v}</div>"
+                    f"<div style='font-size:12px;color:{txt}'>{t}</div></div>")
+
         arrow = "<div style='color:#4a5568;font-size:22px;align-self:center'>◄</div>"
-        late_box = ""
+        html = "<div style='display:flex;gap:10px;flex-wrap:wrap'>"
+        html += arrow.join(_box(v, t, c) for v, t, c in stages)
+        extras = ""
+        if n_irr:
+            extras += "<div style='width:14px'></div>" + _box(n_irr, "לא רלוונטי (נדחה)", "#6b7280")
         if n_late:
-            late_box = (f"<div style='background:#1c1013;border:1px solid #7f1d1d;border-radius:12px;"
-                        f"padding:10px 18px;text-align:center;margin-right:18px'>"
-                        f"<div style='font-size:28px;font-weight:700;color:#ef4444'>{n_late}</div>"
-                        f"<div style='font-size:12px;color:#f0a3a3'>🔴 באיחור</div></div>")
-        st.markdown("<div style='display:flex;gap:10px'>" + arrow.join(boxes) + late_box + "</div>",
-                    unsafe_allow_html=True)
+            extras += "<div style='width:6px'></div>" + _box(n_late, "🔴 באיחור", "#ef4444", "#f0a3a3")
+        html += extras + "</div>"
+        st.markdown(html, unsafe_allow_html=True)
 
         tc = act["סוג ממצא"].value_counts()
         if not tc.empty:
@@ -301,7 +304,7 @@ with tab_period:
 
         # --- שלב 2: ניהול לפי אנליסט — כרטיס לכל מי שקיבל מייל ---
         st.markdown("#### 👤 ניהול לפי אנליסט — כל כרטיס = מייל אחד שנשלח")
-        st.markdown("<div class='note'>פתח כרטיס ⟵ שנה סטטוס לכל בעיה (ממתין/משוב/בטיפול/טופל) ⟵ שמור. "
+        st.markdown("<div class='note'>פתח כרטיס ⟵ שנה סטטוס לכל בעיה (נשלח / התקבל מענה / בטיפול / טופל) ⟵ שמור. "
                     "או השתמש בכפתורים המהירים כשכל הפריטים של האנליסט מתקדמים יחד.</div>",
                     unsafe_allow_html=True)
 
@@ -312,16 +315,15 @@ with tab_period:
             sub = act[act["אנליסט"] == an]
             total, closed = len(sub), int(sub["סטטוס"].isin(core.CLOSED_STATUSES).sum())
             late_an = int(sub["באיחור"].sum())
-            seen_any = bool((sub["חיווי בתאריך"] != "").any())
             if closed == total:
-                icon, state = "✅", "הכל טופל"
+                icon, state = "✅", "הושלם"
             elif late_an:
                 icon, state = "🔴", f"{late_an} באיחור"
-            elif seen_any or (sub["סטטוס"].isin(["נצפה", "בטיפול"])).any():
-                icon, state = "🔵", "התקבל משוב"
+            elif (sub["סטטוס"].isin(core.REPLIED_STATUSES)).any():
+                icon, state = "🔵", "התקבל מענה"
             else:
                 icon, state = "🟡", "ממתין למענה"
-            label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · טופלו {closed}/{total} · {state}"
+            label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total} · {state}"
             with st.expander(label, expanded=bool(late_an)):
                 ed = st.data_editor(
                     sub[EDIT_COLS].sort_values("סוג ממצא"),
@@ -334,13 +336,13 @@ with tab_period:
                         "מזהה": None,
                     }, key=f"an_ed_{sel}_{an}")
                 b1, b2, b3 = st.columns(3)
-                if b1.button("📩 התקבל משוב", use_container_width=True, key=f"fb_{sel}_{an}",
-                             help="האנליסט ענה/אישר — כל הממתינים שלו יסומנו 'נצפה' עם תאריך היום"):
-                    ids = sub[sub["סטטוס"].isin(["פתוח", "נשלח"])]["מזהה"].tolist()
-                    update_findings({i: {"סטטוס": "נצפה", "חיווי בתאריך": core.today_str(),
+                if b1.button("📩 התקבל מענה", use_container_width=True, key=f"fb_{sel}_{an}",
+                             help="האנליסט ענה — כל הממתינים שלו יסומנו 'התקבל מענה' (לאימותך) עם תאריך היום"):
+                    ids = sub[sub["סטטוס"] == "נשלח"]["מזהה"].tolist()
+                    update_findings({i: {"סטטוס": "התקבל מענה", "חיווי בתאריך": core.today_str(),
                                          "מקור חיווי": "ידני"} for i in ids}, "feedback")
                     persist()
-                    st.session_state.flash = f"סומן משוב ל-{len(ids)} ממצאים של {an}"
+                    st.session_state.flash = f"סומן 'התקבל מענה' ל-{len(ids)} ממצאים של {an}"
                     st.rerun()
                 if b2.button("✅ הכל טופל", use_container_width=True, key=f"done_{sel}_{an}",
                              help="כל הממצאים הפתוחים של האנליסט יסומנו 'טופל'"):
@@ -360,9 +362,9 @@ with tab_period:
                     edits = {}
                     for _, r in ed.iterrows():
                         e = {"סטטוס": r["סטטוס"], "הערה": r["הערה"]}
-                        # מעבר ידני לסטטוס-משוב/סגירה בלי חיווי — משלים תאריך אוטומטית
+                        # מעבר ידני לסטטוס שאחרי-מענה בלי חיווי — משלים תאריך אוטומטית
                         old = sub.loc[sub["מזהה"] == r["מזהה"], "חיווי בתאריך"]
-                        if r["סטטוס"] in ("נצפה", "בטיפול", "טופל") and not (len(old) and old.iloc[0]):
+                        if r["סטטוס"] in ("התקבל מענה", "בטיפול", "טופל") and not (len(old) and old.iloc[0]):
                             e.update({"חיווי בתאריך": core.today_str(), "מקור חיווי": "ידני"})
                         edits[r["מזהה"]] = e
                     changed = update_findings(edits, "edit")
@@ -505,7 +507,7 @@ with tab_ingest:
     up_key = f"ingest_up_{st.session_state.get('up_gen', 0)}"
     ups = st.file_uploader("שחרר קבצים כאן", type=["txt", "xlsx", "msg", "eml"],
                            accept_multiple_files=True, key=up_key)
-    mark_sent = st.checkbox("סמן ממצאים חדשים כ'נשלח' מיד (המיילים יוצאים בסוף הריצה)", value=True)
+    st.caption("ממצאים חדשים נכנסים כ'נשלח' (המיילים יוצאים אוטומטית עם פריקת הקובץ בארגון).")
 
     if ups and st.button("📥 קלוט הכול", type="primary"):
         logs = []
@@ -519,7 +521,7 @@ with tab_ingest:
                         msg += f" ⚠️ {res['note']}"
                     logs.append(msg)
                 else:
-                    res = core.merge_findings(led, parsed, mark_sent=mark_sent)
+                    res = core.merge_findings(led, parsed)
                     logs.append(f"📄 {up.name}: תקופה {res['period'] or '?'} — "
                                 f"נוספו {res['added']} ממצאים (דולגו {res['skipped']} קיימים)"
                                 + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else "")
@@ -573,7 +575,7 @@ with tab_ingest:
                                 parsed = core.parse_upload(item["קובץ"], fh.read())
                             if parsed.get("kind") == "mail":
                                 res = core.apply_mail(led, parsed)
-                                tag = "תשובה→נצפה" if res["mail_type"] == "מענה" else "משלוח→נשלח"
+                                tag = "תשובה→התקבל מענה" if res["mail_type"] == "מענה" else "משלוח"
                                 logs.append(f"✉️ {item['קובץ']}: {tag} — {res['touched']} ממצאים"
                                             + (f" ⚠️ {res['note']}" if res.get("note") else ""))
                             else:
@@ -595,17 +597,9 @@ with tab_ingest:
 # ---------- משלוחים ----------
 with tab_ship:
     st.markdown("### יומן משלוחים ומענים")
-    per_opts = sorted(f_all["תקופת בקרה"].unique()) if not f_all.empty else []
-    if per_opts:
-        cc1, cc2 = st.columns([2, 1])
-        sel_p = cc1.selectbox("סימון מהיר — כל ממצאי התקופה שנפתחו יסומנו כנשלחו היום", per_opts)
-        if cc2.button("✅ סמן כנשלחו", use_container_width=True):
-            n = core.mark_period_sent(led, sel_p)
-            persist()
-            st.session_state.flash = f"סומנו {n} ממצאים כנשלחו"
-            st.rerun()
+    st.caption("רישום כרונולוגי של כל מייל שיצא (בפריקה) וכל תשובה שנקלטה.")
     if led["shipments"].empty:
-        st.info("אין משלוחים רשומים עדיין — גרור מייל שנשלח, או השתמש בסימון המהיר.")
+        st.info("אין משלוחים רשומים עדיין — יירשמו אוטומטית עם פריקת קובץ, או בגרירת מייל.")
     else:
         st.dataframe(led["shipments"].iloc[::-1], use_container_width=True, hide_index=True)
 

@@ -14,17 +14,35 @@ import pandas as pd
 
 # ---------------------------------------------------------------- קבועים
 
-STATUSES = ["פתוח", "נשלח", "נצפה", "בטיפול", "טופל", "לא רלוונטי"]
+# מודל הסטטוסים בנוי לפי התהליך בפועל ולפי מה שהמנהל יכול לדעת:
+#   נשלח        — המייל יצא (אוטומטית עם פריקת הקובץ). ממתין לתגובת האנליסט. זה מצב-הכניסה.
+#   התקבל מענה  — האנליסט ענה (לרוב "טופל"). ממתין לאימות שלי. (מחליף את "נצפה" — צפייה אינה ניתנת לידיעה)
+#   בטיפול      — בדקתי ומצאתי שעדיין לא תוקן כראוי / בעבודה. דורש המשך (בד"כ עם הערה).
+#   טופל        — אימתתי שתוקן. (סגור)
+#   לא רלוונטי  — אינו ממצא אמיתי / מסומן בצד. (סגור)
+# ("פתוח" הוסר: הפריקה תמיד שולחת מייל, אז אין מצב-ביניים של "נמצא אך טרם נשלח".)
+STATUSES = ["נשלח", "התקבל מענה", "בטיפול", "טופל", "לא רלוונטי"]
 CLOSED_STATUSES = {"טופל", "לא רלוונטי"}
+ACTIVE_STATUSES = ["נשלח", "התקבל מענה", "בטיפול"]   # דורשים מעקב (לא סגורים)
+REPLIED_STATUSES = ["התקבל מענה", "בטיפול"]           # האנליסט כבר הגיב / בעבודה
 
 STATUS_COLORS = {
-    "פתוח":      "#ef4444",   # אדום
-    "נשלח":      "#f59e0b",   # כתום
-    "נצפה":      "#38bdf8",   # תכלת
-    "בטיפול":    "#eab308",   # צהוב
-    "טופל":      "#22c55e",   # ירוק
+    "נשלח":      "#f59e0b",   # כתום — ממתין למענה
+    "התקבל מענה": "#38bdf8",  # תכלת — לבדיקה
+    "בטיפול":    "#eab308",   # צהוב — בעבודה
+    "טופל":      "#22c55e",   # ירוק — הושלם
     "לא רלוונטי": "#6b7280",  # אפור
 }
+# מיפוי סטטוסים ישנים -> חדשים (מיגרציה של נתונים קיימים)
+STATUS_MIGRATE = {"פתוח": "נשלח", "נצפה": "התקבל מענה"}
+
+
+def migrate_statuses(df):
+    """ממיר סטטוסים ישנים לחדשים בעמודת 'סטטוס' (in-place-safe)."""
+    if df is None or df.empty or "סטטוס" not in df.columns:
+        return df
+    df["סטטוס"] = df["סטטוס"].replace(STATUS_MIGRATE)
+    return df
 
 FINDING_TYPES = {"שגיאה": "שגיאת סיווג", "יחידה": "יחידת מידה",
                  "מיפוי": "מיפוי חסר", "מיפוי-צד": "מיפוי חסר (בצד)", "רשומה": "רשומה חסרה"}
@@ -82,6 +100,7 @@ def load_ledger(path_or_buffer) -> dict:
                     df[c] = ""
             extra = [c for c in df.columns if c not in cols]   # עמודות שהמשתמש הוסיף — נשמרות
             led[key] = df[cols + extra].astype(str)
+    migrate_statuses(led["findings"])
     return led
 
 
@@ -148,9 +167,9 @@ def with_derived(f: pd.DataFrame, reminder_days: int) -> pd.DataFrame:
             return "⚪"
         if r["באיחור"]:
             return "🔴"
-        if r["סטטוס"] in ("נצפה", "בטיפול"):
-            return "🟡"
-        return "🟠"
+        if r["סטטוס"] in REPLIED_STATUSES:   # התקבל מענה / בטיפול
+            return "🔵"
+        return "🟡"                          # נשלח — ממתין למענה
     f["נורה"] = f.apply(lamp, axis=1)
     return f
 
@@ -408,8 +427,10 @@ def merge_findings(led: dict, parsed: dict, mark_sent: bool = False, sent_date: 
             "מזהה": fid, "תקופת בקרה": period, **it,
             "נמען": "" if side else analyst_email(it.get("אנליסט", "")),
             "נמצא בתאריך": when,
-            "סטטוס": "לא רלוונטי" if side else ("נשלח" if mark_sent else "פתוח"),
-            "נשלח בתאריך": "" if side else (when if mark_sent else ""),
+            # מצב-הכניסה תמיד 'נשלח' — הפריקה שולחת מייל אוטומטית (אין 'פתוח').
+            # 'בצד' (PROD וכו') לא נשלח מייל → 'לא רלוונטי'.
+            "סטטוס": "לא רלוונטי" if side else "נשלח",
+            "נשלח בתאריך": "" if side else when,
             "הערה": "בצד — סוג חומר מחוץ ל-Z001-Z004" if side else "",
             "עדכון אחרון": now_str(),
         })
@@ -464,7 +485,7 @@ def _match_recipient(row_email: str, row_analyst: str, addr: str) -> bool:
 
 
 def apply_mail(led: dict, mail: dict) -> dict:
-    """מייל שנגרר: משלוח -> סימון 'נשלח' לממצאי הנמען+תקופה; מענה -> 'נצפה'.
+    """מייל שנגרר: משלוח -> ווידוא תאריך-שליחה לממצאי הנמען; מענה -> 'התקבל מענה' (לאימות).
     בטיחות: בלי נמען/שולח מזוהה — לא מעדכנים כלום (רק נרשם ביומן)."""
     f = led["findings"]
     period, when = mail.get("period", ""), mail.get("date", today_str())
@@ -472,22 +493,22 @@ def apply_mail(led: dict, mail: dict) -> dict:
     if mail["mail_type"] == "משלוח":
         rcpts = re.findall(r"[\w.\-]+@[\w.\-]+", str(mail.get("to", "")).lower())
         if not rcpts:
-            note = "לא זוהו כתובות נמען במייל — לא עודכנו ממצאים (השתמש בסימון המהיר)"
+            note = "לא זוהו כתובות נמען במייל — לא עודכנו ממצאים"
         else:
             for i in f.index:
                 if period and f.at[i, "תקופת בקרה"] != period:
                     continue
                 if not any(_match_recipient(f.at[i, "נמען"], f.at[i, "אנליסט"], a) for a in rcpts):
                     continue
-                if f.at[i, "סטטוס"] == "פתוח":
-                    f.at[i, "סטטוס"] = "נשלח"
+                # משלוח מאשר את השליחה — משלים תאריך-שליחה אם חסר (הסטטוס כבר 'נשלח')
+                if not f.at[i, "נשלח בתאריך"]:
                     f.at[i, "נשלח בתאריך"] = when
                     f.at[i, "עדכון אחרון"] = now_str()
                     touched += 1
     elif mail["mail_type"] == "מענה":
         snds = re.findall(r"[\w.\-]+@[\w.\-]+", str(mail.get("sender", "")).lower())
         if not snds:
-            note = "לא זוהתה כתובת השולח — לא עודכנו ממצאים (סמן חיווי ידנית בטבלה)"
+            note = "לא זוהתה כתובת השולח — לא עודכנו ממצאים (סמן ידנית בטבלה)"
         else:
             snd = snds[0]
             for i in f.index:
@@ -495,8 +516,9 @@ def apply_mail(led: dict, mail: dict) -> dict:
                     continue
                 if period and f.at[i, "תקופת בקרה"] != period:
                     continue
-                if f.at[i, "סטטוס"] in ("פתוח", "נשלח"):
-                    f.at[i, "סטטוס"] = "נצפה"
+                # תשובה התקבלה — ל'התקבל מענה' (לאימות המנהל). לא מסמנים 'טופל' אוטומטית!
+                if f.at[i, "סטטוס"] == "נשלח":
+                    f.at[i, "סטטוס"] = "התקבל מענה"
                     f.at[i, "חיווי בתאריך"] = when
                     f.at[i, "מקור חיווי"] = "מייל"
                     f.at[i, "עדכון אחרון"] = now_str()
@@ -549,6 +571,7 @@ def gs_load_ledger(sh) -> dict:
                 df[c] = ""
         extra = [c for c in df.columns if c not in cols]
         led[key] = df[cols + extra].astype(str)
+    migrate_statuses(led["findings"])
     return led
 
 
@@ -635,11 +658,11 @@ def scan_folder(root: str) -> list:
 
 
 def mark_analyst_seen(led: dict, analyst: str, source: str = "ידני") -> int:
-    """חיווי בקליק: כל ממצאי האנליסט שנשלחו/פתוחים -> נצפה (טלפון/מסדרון)."""
+    """התקבל מענה בקליק: ממצאי האנליסט שב'נשלח' -> 'התקבל מענה' (לאימות)."""
     f, n = led["findings"], 0
     for i in f.index:
-        if f.at[i, "אנליסט"] == analyst and f.at[i, "סטטוס"] in ("פתוח", "נשלח"):
-            f.at[i, "סטטוס"] = "נצפה"
+        if f.at[i, "אנליסט"] == analyst and f.at[i, "סטטוס"] == "נשלח":
+            f.at[i, "סטטוס"] = "התקבל מענה"
             f.at[i, "חיווי בתאריך"] = today_str()
             f.at[i, "מקור חיווי"] = source
             f.at[i, "עדכון אחרון"] = now_str()
@@ -663,28 +686,27 @@ def period_analyst_rows(g: pd.DataFrame) -> pd.DataFrame:
             "כתובת מייל": emails[0] if emails else "— (לא נשלח)",
             "ממצאים": len(sub),
             "נשלח בתאריך": ", ".join(sent) if sent else "טרם נשלח",
-            "פתוח": int((sub["סטטוס"] == "פתוח").sum()),
-            "נשלח": int((sub["סטטוס"] == "נשלח").sum()),
-            "נצפה/בטיפול": int(sub["סטטוס"].isin(["נצפה", "בטיפול"]).sum()),
-            "טופל": int((sub["סטטוס"].isin(["טופל", "לא רלוונטי"])).sum()),
+            "ממתין למענה": int((sub["סטטוס"] == "נשלח").sum()),
+            "התקבל מענה/בטיפול": int(sub["סטטוס"].isin(REPLIED_STATUSES).sum()),
+            "טופל": int((sub["סטטוס"].isin(CLOSED_STATUSES)).sum()),
             "חיווי התקבל": ", ".join(seen) if seen else "—",
         })
     return pd.DataFrame(rows).sort_values("ממצאים", ascending=False)
 
 
 def analyst_progress(f_all: pd.DataFrame) -> pd.DataFrame:
-    """טבלת מעקב לפי אנליסט: כמה נשלחו/נצפו/טופלו + אחוז סגירה."""
+    """טבלת מעקב לפי אנליסט: כמה ממתינים/הגיבו/טופלו + אחוז סגירה."""
     f_all = f_all[~f_all["סוג ממצא"].isin(SIDE_TYPES)]   # 'בצד' לא נספר במעקב האנליסטים
     if f_all.empty:
         return pd.DataFrame()
     rows = []
     for an, g in f_all.groupby("אנליסט"):
         total = len(g)
-        done = int((g["סטטוס"] == "טופל").sum()) + int((g["סטטוס"] == "לא רלוונטי").sum())
+        done = int(g["סטטוס"].isin(CLOSED_STATUSES).sum())
         rows.append({
             "אנליסט": an, "סהכ": total,
             "נשלחו": int((g["סטטוס"] == "נשלח").sum()),
-            "נצפו/בטיפול": int(g["סטטוס"].isin(["נצפה", "בטיפול"]).sum()),
+            "נצפו/בטיפול": int(g["סטטוס"].isin(REPLIED_STATUSES).sum()),
             "טופלו": done,
             "באיחור": int(g["באיחור"].sum()) if "באיחור" in g else 0,
             "אחוז סגירה": round(100 * done / total) if total else 0,
