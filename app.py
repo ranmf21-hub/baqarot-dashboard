@@ -338,25 +338,24 @@ with tab_period:
                 open_sub = sub[~sub["סטטוס"].isin(core.CLOSED_STATUSES)]
                 to_addr = sub["נמען"].iloc[0] if len(sub) else ""
 
-                # --- מעקב Outlook: טיוטת .eml שנפתחת ישירות ב-Outlook (לא תלוי בדפדפן) ---
+                # --- מעקב Outlook: כפתור-מייל נפרד לכל פריט פתוח (טיוטת .eml שנפתחת ב-Outlook) ---
                 if len(open_sub):
-                    st.markdown("<div class='note'>📧 <b>מעקב ב-Outlook</b> — הורד טיוטה ופתח את הקובץ; "
-                                "Outlook ייפתח עם המייל מוכן לשליחה:</div>", unsafe_allow_html=True)
-                    oc1, oc2 = st.columns([2, 1])
-                    labels = {f"בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:26]}": r["מזהה"]
-                              for _, r in open_sub.iterrows()}
-                    pk = oc1.selectbox("פריט לטיוטה", list(labels), key=f"pk_{sel}_{an}",
-                                       label_visibility="collapsed")
-                    prow = open_sub[open_sub["מזהה"] == labels[pk]].iloc[0].to_dict()
-                    oc2.download_button("📧 טיוטה לפריט", core.followup_eml(prow),
-                                        file_name=f"followup_{prow['מספר בקשה']}_{prow['שורה']}.eml",
-                                        mime="message/rfc822", key=f"dl_{sel}_{an}",
-                                        use_container_width=True)
-                    if to_addr:
-                        st.download_button(f"📧 טיוטה אחת לכל {len(open_sub)} הפתוחים",
+                    st.markdown("<div class='note'>📧 <b>שליחת מייל-מעקב</b> ('האם הפריט טופל?') — לחץ על "
+                                "הכפתור של הפריט, הקובץ יורד, פתח אותו ו-Outlook ייפתח עם המייל מוכן לשליחה:</div>",
+                                unsafe_allow_html=True)
+                    for _, r in open_sub.iterrows():
+                        st.download_button(
+                            f"📧 מייל מעקב — בקשה {r['מספר בקשה']} שורה {r['שורה']}  ·  {str(r['תיאור'])[:30]}",
+                            core.followup_eml(r.to_dict()),
+                            file_name=f"followup_{r['מספר בקשה']}_{r['שורה']}.eml",
+                            mime="message/rfc822", key=f"dl_{sel}_{an}_{r['מזהה']}",
+                            use_container_width=True)
+                    if to_addr and len(open_sub) > 1:
+                        st.download_button(f"📧 מייל אחד לכל {len(open_sub)} הפריטים הפתוחים של {an}",
                                            core.followup_eml_bulk(open_sub, to_addr),
                                            file_name=f"followup_{an}.eml", mime="message/rfc822",
-                                           key=f"dlb_{sel}_{an}")
+                                           key=f"dlb_{sel}_{an}", use_container_width=True)
+                    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
                 b2, b3 = st.columns(2)
                 if b2.button("✅ הכל טופל", use_container_width=True, key=f"done_{sel}_{an}",
