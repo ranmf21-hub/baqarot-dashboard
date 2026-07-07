@@ -533,6 +533,7 @@ def scan_folder(root: str) -> list:
         for fn in files:
             if fn.startswith("~$"):
                 continue
+            low = fn.lower()
             kind = None
             if fn == "mail_queue.txt":
                 kind = "תור מיילים"
@@ -540,6 +541,8 @@ def scan_folder(root: str) -> list:
                 kind = "קובץ בקרה"
             elif fn.endswith(".xlsx") and fn.startswith("תפוקת אנליסטים"):
                 kind = "דוח תפוקה"
+            elif low.endswith((".msg", ".eml")):
+                kind = "מייל/תשובה"   # מייל שנשלח או תשובת אנליסט
             if not kind:
                 continue
             p = os.path.join(dirpath, fn)
@@ -549,9 +552,10 @@ def scan_folder(root: str) -> list:
                 mtime = ""
             out.append({"סוג": kind, "תקופה": _period_from_name(fn), "קובץ": fn,
                         "תאריך הריצה": mtime, "נתיב": p})
-    # קובצי בקרה קודם (הם מקור הממצאים), אחר-כך תפוקה, ותורים אחרונים (דה-דופ ידאג לשאר)
-    order = {"קובץ בקרה": 0, "דוח תפוקה": 1, "תור מיילים": 2}
-    out.sort(key=lambda r: (r["תקופה"], order.get(r["סוג"], 9)))
+    # קובצי בקרה קודם (מקור הממצאים) → תפוקה → תורים → מיילים אחרונים
+    # (המיילים אחרונים כי הם מסמנים ממצאים שכבר חייבים להיות במאגר).
+    order = {"קובץ בקרה": 0, "דוח תפוקה": 1, "תור מיילים": 2, "מייל/תשובה": 3}
+    out.sort(key=lambda r: (order.get(r["סוג"], 9), r["תקופה"]))
     return out
 
 

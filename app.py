@@ -465,20 +465,29 @@ with tab_ingest:
                 picked = st.data_editor(sdf[["קלוט", "סוג", "תקופה", "קובץ", "תאריך הריצה"]],
                                         hide_index=True, use_container_width=True,
                                         disabled=["סוג", "תקופה", "קובץ", "תאריך הריצה"], key="scan_pick")
+                st.markdown("<div class='note'>ניתן להוסיף לתיקייה גם מיילי-תשובה (msg/eml) — "
+                            "הם ייקלטו אחרי הממצאים ויסמנו 'נצפה' את מי שהשיב.</div>",
+                            unsafe_allow_html=True)
                 if st.button("📥 קלוט את המסומנים", type="primary", key="scan_go"):
                     logs = []
-                    for i, row in picked.iterrows():
-                        if not row["קלוט"]:
-                            continue
-                        item = scan[i]
+                    picked_items = [scan[i] for i, row in picked.iterrows() if row["קלוט"]]
+                    # הממצאים קודם, המיילים אחרונים (כדי שהתשובות יסמנו ממצאים קיימים)
+                    picked_items.sort(key=lambda it: 1 if it["סוג"] == "מייל/תשובה" else 0)
+                    for item in picked_items:
                         try:
                             with open(item["נתיב"], "rb") as fh:
                                 parsed = core.parse_upload(item["קובץ"], fh.read())
-                            res = core.merge_findings(led, parsed, mark_sent=True,
-                                                      sent_date=item["תאריך הריצה"])
-                            logs.append(f"📄 {item['קובץ']}: תקופה {res['period'] or '?'} — "
-                                        f"נוספו {res['added']} (דולגו {res['skipped']})"
-                                        + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else ""))
+                            if parsed.get("kind") == "mail":
+                                res = core.apply_mail(led, parsed)
+                                tag = "תשובה→נצפה" if res["mail_type"] == "מענה" else "משלוח→נשלח"
+                                logs.append(f"✉️ {item['קובץ']}: {tag} — {res['touched']} ממצאים"
+                                            + (f" ⚠️ {res['note']}" if res.get("note") else ""))
+                            else:
+                                res = core.merge_findings(led, parsed, mark_sent=True,
+                                                          sent_date=item["תאריך הריצה"])
+                                logs.append(f"📄 {item['קובץ']}: תקופה {res['period'] or '?'} — "
+                                            f"נוספו {res['added']} (דולגו {res['skipped']})"
+                                            + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else ""))
                         except Exception as e:
                             logs.append(f"❌ {item['קובץ']}: {e}")
                     if persist():
