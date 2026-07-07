@@ -439,7 +439,9 @@ with tab_ingest:
                     res = core.merge_findings(led, parsed, mark_sent=mark_sent)
                     logs.append(f"📄 {up.name}: תקופה {res['period'] or '?'} — "
                                 f"נוספו {res['added']} ממצאים (דולגו {res['skipped']} קיימים)"
-                                + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else ""))
+                                + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else "")
+                                + (f", נסגרו אוטומטית {res['closed_auto']} (תוקנו — לא נמצאים יותר בקובץ)"
+                                   if res.get("closed_auto") else ""))
             except Exception as e:
                 logs.append(f"❌ {up.name}: {e}")
         if persist():
@@ -495,7 +497,9 @@ with tab_ingest:
                                                           sent_date=item["תאריך הריצה"])
                                 logs.append(f"📄 {item['קובץ']}: תקופה {res['period'] or '?'} — "
                                             f"נוספו {res['added']} (דולגו {res['skipped']})"
-                                            + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else ""))
+                                            + (f", תפוקה: {res['prod_added']}" if res.get("prod_added") else "")
+                                            + (f", נסגרו אוטומטית {res['closed_auto']}"
+                                               if res.get("closed_auto") else ""))
                         except Exception as e:
                             logs.append(f"❌ {item['קובץ']}: {e}")
                     if persist():

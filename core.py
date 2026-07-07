@@ -417,6 +417,26 @@ def merge_findings(led: dict, parsed: dict, mark_sent: bool = False, sent_date: 
         added += 1
     led["findings"] = f
 
+    # סגירה אוטומטית: קובץ-בקרה/תור-מיילים הוא הרשימה המלאה של הממצאים בתקופה נכון לרגע הריצה —
+    # ממצא פתוח מאותה תקופה שלא מופיע יותר בפריקה החדשה = תוקן בפועל (הנתונים חייבים לשקף את הקובץ).
+    closed_auto = 0
+    if parsed.get("kind") in ("control", "queue") and period:
+        current_ids = {finding_id(it["מספר בקשה"], it["שורה"], it["סוג ממצא"], period)
+                       for it in parsed.get("findings", [])}
+        f = led["findings"]
+        for i in f.index:
+            if f.at[i, "תקופת בקרה"] != period or f.at[i, "סטטוס"] in CLOSED_STATUSES:
+                continue
+            if f.at[i, "מזהה"] in current_ids:
+                continue
+            f.at[i, "סטטוס"] = "טופל"
+            f.at[i, "הערה"] = "נסגר אוטומטית — לא נמצא יותר בריצה העדכנית"
+            if not f.at[i, "חיווי בתאריך"]:
+                f.at[i, "חיווי בתאריך"] = when
+            f.at[i, "עדכון אחרון"] = now_str()
+            closed_auto += 1
+        led["findings"] = f
+
     prod_added = 0
     if parsed.get("prod"):
         p = led["prod"]
@@ -429,7 +449,7 @@ def merge_findings(led: dict, parsed: dict, mark_sent: bool = False, sent_date: 
                               ignore_index=True)
                 prod_added += 1
         led["prod"] = p
-    return {"added": added, "skipped": skipped, "prod_added": prod_added, "period": period}
+    return {"added": added, "skipped": skipped, "prod_added": prod_added, "period": period, "closed_auto": closed_auto}
 
 
 def _match_recipient(row_email: str, row_analyst: str, addr: str) -> bool:
@@ -546,6 +566,21 @@ def gs_save_ledger(led: dict, sh):
         ws.update(range_name="A1", values=data, value_input_option="RAW")
 
 
+def _peek_queue_period(path: str) -> str:
+    """קורא רק את שורת ה-META מתוך mail_queue.txt (בלי לטעון את כל הקובץ) כדי לזהות את התקופה האמיתית."""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read(4096)
+    except OSError:
+        return ""
+    try:
+        text = data.decode("utf-16") if data[:2] in (b"\xff\xfe", b"\xfe\xff") else data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return ""
+    m = re.search(r"^META\t([^\t\r\n]+)", text, re.M)
+    return m.group(1).strip() if m else ""
+
+
 def scan_folder(root: str) -> list:
     """סורק תיקייה (רקורסיבית) ומאתר את כל תוצרי הצינור לקליטת-עבר מרוכזת."""
     out = []
@@ -575,17 +610,21 @@ def scan_folder(root: str) -> list:
                 mtime = dt.date.fromtimestamp(mt).strftime("%d.%m.%Y")
             except OSError:
                 mt, mtime = 0.0, ""
-            out.append({"סוג": kind, "תקופה": _period_from_name(fn), "קובץ": fn,
+            # תור-מיילים תמיד נקרא "mail_queue.txt" — התקופה נקראת מתוך שורת ה-META בתוכן, לא מהשם
+            period = _peek_queue_period(p) if kind == "תור מיילים" else _period_from_name(fn)
+            out.append({"סוג": kind, "תקופה": period, "קובץ": fn,
                         "תאריך הריצה": mtime, "נתיב": p, "_mt": mt})
-    # קובץ אמת אחד לכל תקופה: כשיש כמה גרסאות של קובץ-בקרה לאותה תקופה,
-    # נקלט רק החדש ביותר (איחוד גרסאות ניפח ממצאים שתוקנו בין גרסאות — פער ה-8/7 של ינואר).
+    # קובץ אמת אחד לכל תקופה (לכל סוג בנפרד): כשיש כמה גרסאות/ריצות-חוזרות לאותה תקופה,
+    # נקלט רק החדש ביותר — אחרת ממצא שתוקן בריצה מאוחרת "קופץ" בחזרה מגרסה ישנה (פער ה-8/7 של ינואר).
     newest = {}
+    dedup_kinds = {"קובץ בקרה", "תור מיילים"}
     for r in out:
-        if r["סוג"] == "קובץ בקרה" and r["תקופה"]:
-            if r["תקופה"] not in newest or r["_mt"] > newest[r["תקופה"]]["_mt"]:
-                newest[r["תקופה"]] = r
+        if r["סוג"] in dedup_kinds and r["תקופה"]:
+            key = (r["סוג"], r["תקופה"])
+            if key not in newest or r["_mt"] > newest[key]["_mt"]:
+                newest[key] = r
     out = [r for r in out
-           if not (r["סוג"] == "קובץ בקרה" and r["תקופה"] and newest[r["תקופה"]] is not r)]
+           if not (r["סוג"] in dedup_kinds and r["תקופה"] and newest[(r["סוג"], r["תקופה"])] is not r)]
     # קובצי בקרה קודם (מקור הממצאים) → תפוקה → תורים → מיילים אחרונים
     # (המיילים אחרונים כי הם מסמנים ממצאים שכבר חייבים להיות במאגר).
     order = {"קובץ בקרה": 0, "דוח תפוקה": 1, "תור מיילים": 2, "מייל/תשובה": 3}
