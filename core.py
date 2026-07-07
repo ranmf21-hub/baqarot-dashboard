@@ -26,7 +26,15 @@ STATUS_COLORS = {
     "לא רלוונטי": "#6b7280",  # אפור
 }
 
-FINDING_TYPES = {"שגיאה": "שגיאת סיווג", "יחידה": "יחידת מידה"}
+FINDING_TYPES = {"שגיאה": "שגיאת סיווג", "יחידה": "יחידת מידה",
+                 "מיפוי": "מיפוי חסר", "מיפוי-צד": "מיפוי חסר (בצד)", "רשומה": "רשומה חסרה"}
+TYPE_COLORS = {"שגיאת סיווג": "#ef4444", "יחידת מידה": "#f59e0b",
+               "מיפוי חסר": "#a855f7", "מיפוי חסר (בצד)": "#6b7280", "רשומה חסרה": "#38bdf8"}
+MAILABLE_Z = {"Z001", "Z002", "Z003", "Z004"}   # פער-מיפוי בסוגים אלה = ממצא אמיתי (מייל)
+OK_MISSING_Z = {"Z005", "Z028"}                  # רשומה-חסרה בסוגים אלה = תקין, לא ממצא
+SIDE_TYPES = {"מיפוי חסר (בצד)"}                 # מסומן בצד — בלי מייל, סטטוס 'לא רלוונטי'
+_DEFAULT_EXPECTED = {"יחידה": "EA", "מיפוי": "אין כלל בקובץ העזר",
+                     "מיפוי-צד": "אין כלל בקובץ העזר", "רשומה": "השלמת נתונים בפריקה"}
 
 FINDINGS_COLS = [
     "מזהה", "תקופת בקרה", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
@@ -185,7 +193,7 @@ def parse_mail_queue(data: bytes) -> dict:
             findings.append({
                 "סוג ממצא": FINDING_TYPES[tag], "אנליסט": p[1],
                 "מספר בקשה": p[2], "שורה": p[3], "מקט": p[4], "תיאור": p[5],
-                "נמצא": p[6], "צפוי": p[7] if p[7] else ("EA" if tag == "יחידה" else ""),
+                "נמצא": p[6], "צפוי": p[7] if p[7] else _DEFAULT_EXPECTED.get(tag, ""),
             })
     return {"kind": "queue", "period": period, "findings": findings, "prod": prod}
 
@@ -223,13 +231,27 @@ def parse_control_xlsx(data: bytes, filename: str = "") -> dict:
             continue
         base = {"מספר בקשה": req, "שורה": line, "מקט": nz(col(3)[i]),
                 "תיאור": nz(col(8)[i]), "אנליסט": nz(col(6)[i])}
+        D = base["מקט"]
+        E = nz(col(4)[i])       # סוג חומר
+        W = nz(col(22)[i])      # היררכיה
+        Zc = nz(col(25)[i])     # שרשור סוג+המרה
+        AA = nz(col(26)[i])     # סיווג צפוי
         ab = col(27)[i]
         if ab is False or nz(ab).upper() == "FALSE":
             findings.append({**base, "סוג ממצא": "שגיאת סיווג",
-                             "נמצא": nz(col(20)[i]), "צפוי": nz(col(26)[i])})
+                             "נמצא": nz(col(20)[i]), "צפוי": AA})
         unit = nz(col(13)[i])
         if unit and unit.upper() != "EA":
             findings.append({**base, "סוג ממצא": "יחידת מידה", "נמצא": unit, "צפוי": "EA"})
+        # אין כלל מיפוי לצירוף: יש שרשור אך אין סיווג צפוי.
+        # Z001-Z004 = ממצא אמיתי (מייל); סוגים אחרים (PROD/Z028...) = מסומן בצד.
+        if D and Zc and not AA:
+            t = "מיפוי חסר" if E in MAILABLE_Z else "מיפוי חסר (בצד)"
+            findings.append({**base, "סוג ממצא": t, "נמצא": Zc, "צפוי": "אין כלל בקובץ העזר"})
+        # רשומה חסרה בגלם: תקין רק ל-Z005/Z028; כל סוג אחר = חריג שחייב לצוף.
+        if D and not W and E not in OK_MISSING_Z:
+            findings.append({**base, "סוג ממצא": "רשומה חסרה",
+                             "נמצא": E or "סוג חומר לא ידוע", "צפוי": "השלמת נתונים בפריקה"})
     return {"kind": "control", "period": _period_from_name(filename), "findings": findings, "prod": []}
 
 
@@ -380,13 +402,15 @@ def merge_findings(led: dict, parsed: dict, mark_sent: bool = False, sent_date: 
         if not f.empty and (f["מזהה"] == fid).any():
             skipped += 1
             continue
+        side = it.get("סוג ממצא") in SIDE_TYPES   # מסומן בצד — לא נשלח מייל, סגור מראש
         row = {c: "" for c in FINDINGS_COLS}
         row.update({
             "מזהה": fid, "תקופת בקרה": period, **it,
-            "נמען": analyst_email(it.get("אנליסט", "")),
+            "נמען": "" if side else analyst_email(it.get("אנליסט", "")),
             "נמצא בתאריך": when,
-            "סטטוס": "נשלח" if mark_sent else "פתוח",
-            "נשלח בתאריך": when if mark_sent else "",
+            "סטטוס": "לא רלוונטי" if side else ("נשלח" if mark_sent else "פתוח"),
+            "נשלח בתאריך": "" if side else (when if mark_sent else ""),
+            "הערה": "בצד — סוג חומר מחוץ ל-Z001-Z004" if side else "",
             "עדכון אחרון": now_str(),
         })
         f = pd.concat([f, pd.DataFrame([row])[FINDINGS_COLS]], ignore_index=True)
@@ -547,15 +571,27 @@ def scan_folder(root: str) -> list:
                 continue
             p = os.path.join(dirpath, fn)
             try:
-                mtime = dt.date.fromtimestamp(os.path.getmtime(p)).strftime("%d.%m.%Y")
+                mt = os.path.getmtime(p)
+                mtime = dt.date.fromtimestamp(mt).strftime("%d.%m.%Y")
             except OSError:
-                mtime = ""
+                mt, mtime = 0.0, ""
             out.append({"סוג": kind, "תקופה": _period_from_name(fn), "קובץ": fn,
-                        "תאריך הריצה": mtime, "נתיב": p})
+                        "תאריך הריצה": mtime, "נתיב": p, "_mt": mt})
+    # קובץ אמת אחד לכל תקופה: כשיש כמה גרסאות של קובץ-בקרה לאותה תקופה,
+    # נקלט רק החדש ביותר (איחוד גרסאות ניפח ממצאים שתוקנו בין גרסאות — פער ה-8/7 של ינואר).
+    newest = {}
+    for r in out:
+        if r["סוג"] == "קובץ בקרה" and r["תקופה"]:
+            if r["תקופה"] not in newest or r["_mt"] > newest[r["תקופה"]]["_mt"]:
+                newest[r["תקופה"]] = r
+    out = [r for r in out
+           if not (r["סוג"] == "קובץ בקרה" and r["תקופה"] and newest[r["תקופה"]] is not r)]
     # קובצי בקרה קודם (מקור הממצאים) → תפוקה → תורים → מיילים אחרונים
     # (המיילים אחרונים כי הם מסמנים ממצאים שכבר חייבים להיות במאגר).
     order = {"קובץ בקרה": 0, "דוח תפוקה": 1, "תור מיילים": 2, "מייל/תשובה": 3}
     out.sort(key=lambda r: (order.get(r["סוג"], 9), r["תקופה"]))
+    for r in out:
+        r.pop("_mt", None)
     return out
 
 
@@ -575,6 +611,7 @@ def mark_analyst_seen(led: dict, analyst: str, source: str = "ידני") -> int:
 
 def period_analyst_rows(g: pd.DataFrame) -> pd.DataFrame:
     """לכל אנליסט בתקופה: כתובת שאליה נשלח, כמה ממצאים, מתי נשלח, פילוח סטטוס, מתי התקבל חיווי."""
+    g = g[~g["סוג ממצא"].isin(SIDE_TYPES)]   # 'בצד' לא נשלח במייל — לא שייך לטבלת המשלוחים
     if g.empty:
         return pd.DataFrame()
     rows = []
@@ -598,6 +635,7 @@ def period_analyst_rows(g: pd.DataFrame) -> pd.DataFrame:
 
 def analyst_progress(f_all: pd.DataFrame) -> pd.DataFrame:
     """טבלת מעקב לפי אנליסט: כמה נשלחו/נצפו/טופלו + אחוז סגירה."""
+    f_all = f_all[~f_all["סוג ממצא"].isin(SIDE_TYPES)]   # 'בצד' לא נספר במעקב האנליסטים
     if f_all.empty:
         return pd.DataFrame()
     rows = []

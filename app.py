@@ -264,7 +264,7 @@ with tab_over:
 
         g2 = f_all.groupby(["תקופת בקרה", "סוג ממצא"]).size().reset_index(name="n")
         fig = px.bar(g2, x="תקופת בקרה", y="n", color="סוג ממצא", barmode="group",
-                     color_discrete_map={"שגיאת סיווג": "#ef4444", "יחידת מידה": "#f59e0b"},
+                     color_discrete_map=core.TYPE_COLORS,
                      title="ממצאים לפי תקופת בקרה")
         fig.update_layout(height=300, **PLOTLY_DARK)
         st.plotly_chart(fig, use_container_width=True)
@@ -305,17 +305,25 @@ with tab_period:
         sel = st.selectbox("בחר תקופת בקרה (קובץ) לצפייה:", periods)
         g = f_all[f_all["תקופת בקרה"] == sel]
 
-        # KPI לתקופה
-        n_err = int((g["סוג ממצא"] == "שגיאת סיווג").sum())
-        n_uom = int((g["סוג ממצא"] == "יחידת מידה").sum())
-        n_open = int((~g["סטטוס"].isin(core.CLOSED_STATUSES)).sum())
-        n_done = int(g["סטטוס"].isin(core.CLOSED_STATUSES).sum())
-        kk = st.columns(4)
+        # KPI לתקופה — ממצאים לטיפול מול "בצד" (סוגי חומר מחוץ ל-Z001-Z004)
+        side_mask = g["סוג ממצא"].isin(core.SIDE_TYPES)
+        act = g[~side_mask]
+        n_err = int((act["סוג ממצא"] == "שגיאת סיווג").sum())
+        n_uom = int((act["סוג ממצא"] == "יחידת מידה").sum())
+        n_map = int((act["סוג ממצא"] == "מיפוי חסר").sum())
+        n_rec = int((act["סוג ממצא"] == "רשומה חסרה").sum())
+        n_done = int(act["סטטוס"].isin(core.CLOSED_STATUSES).sum())
+        kk = st.columns(6)
         for col, (v, t, c) in zip(kk, [
-            (len(g), "סה\"כ ממצאים", "blue"), (n_err, "שגיאות סיווג", "red"),
-            (n_uom, "יחידות מידה", "orange"), (f"{n_done}/{len(g)}", "טופלו", "green")]):
+            (len(act), "ממצאים לטיפול", "blue"), (n_err, "שגיאות סיווג", "red"),
+            (n_uom, "יחידות מידה", "orange"), (n_map, "מיפוי חסר", "red"),
+            (n_rec, "רשומה חסרה", "orange"), (f"{n_done}/{len(act)}", "טופלו", "green")]):
             col.markdown(f"<div class='kpi {c}'><div class='v'>{v}</div><div class='t'>{t}</div></div>",
                          unsafe_allow_html=True)
+        if int(side_mask.sum()):
+            st.markdown(f"<div class='note'>ℹ️ בנוסף {int(side_mask.sum())} פערי-מיפוי מסומנים <b>בצד</b> "
+                        f"(סוגי חומר כמו PROD/Z028 — לא נשלח עליהם מייל, מסוננים מהמעקב). "
+                        f"מופיעים בטבלה למטה תחת 'מיפוי חסר (בצד)'.</div>", unsafe_allow_html=True)
 
         # מבט 1 — למי נשלחו מיילים ומה הסטטוס
         st.markdown("### ✉️ למי נשלחו מיילים — ומה הסטטוס")
