@@ -303,12 +303,11 @@ with tab_period:
 
         # --- שלב 2: ניהול לפי אנליסט — כרטיס לכל מי שקיבל מייל ---
         st.markdown("#### 👤 ניהול לפי אנליסט — כל כרטיס = מייל אחד שנשלח")
-        st.markdown("<div class='note'>ליד כל שורה יש 📧 <b>שאל אם טופל</b> — לחיצה פותחת מייל-מעקב מוכן "
-                    "(נוסח קבוע) לאותו פריט; שלח אותו, וכשמאשרים — סמן בעמודת הסטטוס 'טופל' ושמור.</div>",
-                    unsafe_allow_html=True)
+        st.markdown("<div class='note'>לכל פריט אפשר לשלוח מייל-מעקב עם נוסח קבוע ('האם טופל?'). "
+                    "מומלץ <b>📧 טיוטת Outlook</b> — נפתחת ישירות בחלון-כתיבה של Outlook (הורד את הקובץ ופתח אותו). "
+                    "כשמאשרים לך — סמן 'טופל' בעמודת הסטטוס ושמור.</div>", unsafe_allow_html=True)
 
-        # 'מעקב' (mailto) מוצג כעמודת-קישור; 'סטטוס'/'הערה' ניתנות לעריכה; השאר לקריאה
-        SHOW = ["מעקב", "סטטוס", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
+        SHOW = ["סטטוס", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
                 "נמצא", "צפוי", "הערה", "מזהה"]
         order = (act.assign(_open=~act["סטטוס"].isin(core.CLOSED_STATUSES))
                  .groupby("אנליסט")["_open"].sum().sort_values(ascending=False))
@@ -326,27 +325,40 @@ with tab_period:
                 icon, state = "🟡", "ממתין"
             label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total} · {state}"
             with st.expander(label, expanded=bool(late_an)):
-                disp = sub.copy()
-                disp["מעקב"] = disp.apply(core.followup_mailto, axis=1)
                 ed = st.data_editor(
-                    disp[SHOW].sort_values("סטטוס"),
+                    sub[SHOW].sort_values("סטטוס"),
                     hide_index=True, use_container_width=True,
                     disabled=[c for c in SHOW if c not in ("סטטוס", "הערה")],
                     column_config={
-                        "מעקב": st.column_config.LinkColumn("מעקב", display_text="📧 שאל אם טופל",
-                                                             width="small"),
                         "סטטוס": st.column_config.SelectboxColumn("סטטוס", options=core.STATUSES,
                                                                    width="small"),
                         "הערה": st.column_config.TextColumn("הערה", width="medium"),
                         "מזהה": None,
                     }, key=f"an_ed_{sel}_{an}")
                 open_sub = sub[~sub["סטטוס"].isin(core.CLOSED_STATUSES)]
-                b1, b2, b3 = st.columns([1.4, 1, 1])
-                with b1:
-                    if len(open_sub) and sub["נמען"].iloc[0]:
-                        st.link_button(f"📧 מייל מעקב לכל הפתוחים ({len(open_sub)})",
-                                       core.followup_mailto_bulk(open_sub, sub["נמען"].iloc[0]),
-                                       use_container_width=True)
+                to_addr = sub["נמען"].iloc[0] if len(sub) else ""
+
+                # --- מעקב Outlook: טיוטת .eml שנפתחת ישירות ב-Outlook (לא תלוי בדפדפן) ---
+                if len(open_sub):
+                    st.markdown("<div class='note'>📧 <b>מעקב ב-Outlook</b> — הורד טיוטה ופתח את הקובץ; "
+                                "Outlook ייפתח עם המייל מוכן לשליחה:</div>", unsafe_allow_html=True)
+                    oc1, oc2 = st.columns([2, 1])
+                    labels = {f"בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:26]}": r["מזהה"]
+                              for _, r in open_sub.iterrows()}
+                    pk = oc1.selectbox("פריט לטיוטה", list(labels), key=f"pk_{sel}_{an}",
+                                       label_visibility="collapsed")
+                    prow = open_sub[open_sub["מזהה"] == labels[pk]].iloc[0].to_dict()
+                    oc2.download_button("📧 טיוטה לפריט", core.followup_eml(prow),
+                                        file_name=f"followup_{prow['מספר בקשה']}_{prow['שורה']}.eml",
+                                        mime="message/rfc822", key=f"dl_{sel}_{an}",
+                                        use_container_width=True)
+                    if to_addr:
+                        st.download_button(f"📧 טיוטה אחת לכל {len(open_sub)} הפתוחים",
+                                           core.followup_eml_bulk(open_sub, to_addr),
+                                           file_name=f"followup_{an}.eml", mime="message/rfc822",
+                                           key=f"dlb_{sel}_{an}")
+
+                b2, b3 = st.columns(2)
                 if b2.button("✅ הכל טופל", use_container_width=True, key=f"done_{sel}_{an}",
                              help="כל הממצאים הפתוחים של האנליסט יסומנו 'טופל'"):
                     edits = {}

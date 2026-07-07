@@ -38,11 +38,9 @@ STATUS_COLORS = {
 STATUS_MIGRATE = {"פתוח": "נשלח", "נצפה": "בטיפול", "התקבל מענה": "בטיפול"}
 
 
-def followup_mailto(row) -> str:
-    """קישור mailto לפתיחת מייל-מעקב עם נוסח מוגדר, על שורת-ממצא אחת.
-    לחיצה פותחת את תוכנת המייל (Outlook) עם נמען+נושא+גוף מוכנים — המשתמש שולח בעצמו."""
+def _followup_subject_body(row):
     g = (lambda k: str(row.get(k, "") or ""))
-    to, req, line = g("נמען"), g("מספר בקשה"), g("שורה")
+    req, line = g("מספר בקשה"), g("שורה")
     subj = f"מעקב בקרת קטלוג — בקשה {req} שורה {line}"
     body = (
         "שלום,\n\n"
@@ -55,21 +53,54 @@ def followup_mailto(row) -> str:
         "האם הפריט טופל? נא להשיב: טופל / עדיין בטיפול.\n\n"
         "תודה."
     )
-    q = urllib.parse.quote
-    return f"mailto:{to}?subject={q(subj)}&body={q(body)}"
+    return subj, body
 
 
-def followup_mailto_bulk(sub, to) -> str:
-    """מייל-מעקב אחד לכל הפריטים הפתוחים של אנליסט (רשימה בגוף המייל)."""
-    lines = []
-    for _, r in sub.iterrows():
-        lines.append(f"• בקשה {r['מספר בקשה']} שורה {r['שורה']} (מק\"ט {r['מקט']}) — "
-                     f"{r['סוג ממצא']}: {r['תיאור']}")
+def _bulk_subject_body(sub):
+    lines = [f"• בקשה {r['מספר בקשה']} שורה {r['שורה']} (מק\"ט {r['מקט']}) — "
+             f"{r['סוג ממצא']}: {r['תיאור']}" for _, r in sub.iterrows()]
     subj = "מעקב בקרת קטלוג — אישור טיפול בפריטים"
     body = ("שלום,\n\nבהמשך לבקרת הקטלוג, נא לאשר את הטיפול בפריטים הבאים "
             "(להשיב ליד כל פריט: טופל / עדיין בטיפול):\n\n" + "\n".join(lines) + "\n\nתודה.")
+    return subj, body
+
+
+def followup_mailto(row) -> str:
+    """קישור mailto (עובד 1-קליק אם Outlook הוא תוכנת ברירת-המחדל למייל)."""
+    subj, body = _followup_subject_body(row)
+    q = urllib.parse.quote
+    return f"mailto:{str(row.get('נמען','') or '')}?subject={q(subj)}&body={q(body)}"
+
+
+def followup_mailto_bulk(sub, to) -> str:
+    subj, body = _bulk_subject_body(sub)
     q = urllib.parse.quote
     return f"mailto:{to}?subject={q(subj)}&body={q(body)}"
+
+
+def _make_eml(to, subj, body) -> bytes:
+    """בונה קובץ .eml עם X-Unsent:1 — נפתח ישירות בחלון-כתיבה של Outlook שולחן-העבודה,
+    ללא תלות בתוכנת ברירת-המחדל של הדפדפן. פשוט לפתוח את הקובץ שהורד."""
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    if to:
+        msg["To"] = to
+    msg["Subject"] = subj
+    msg["X-Unsent"] = "1"          # הדגל שגורם ל-Outlook לפתוח כטיוטה ניתנת-לעריכה ולשליחה
+    msg.set_content(body)          # UTF-8 (עברית) מקודד אוטומטית
+    return msg.as_bytes()
+
+
+def followup_eml(row) -> bytes:
+    """טיוטת Outlook (.eml) לפריט בודד."""
+    subj, body = _followup_subject_body(row)
+    return _make_eml(str(row.get("נמען", "") or ""), subj, body)
+
+
+def followup_eml_bulk(sub, to) -> bytes:
+    """טיוטת Outlook (.eml) לכל הפריטים הפתוחים של אנליסט."""
+    subj, body = _bulk_subject_body(sub)
+    return _make_eml(to, subj, body)
 
 
 def migrate_statuses(df):
