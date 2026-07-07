@@ -343,8 +343,11 @@ with tab_period:
                     with st.popover(f"📧 שלח מייל-מעקב  ({len(open_sub)} פתוחים)", use_container_width=True):
                         st.markdown("<div class='note'>בחר פריט, הורד את הטיוטה ופתח אותה — "
                                     "Outlook ייפתח עם המייל מוכן לשליחה.</div>", unsafe_allow_html=True)
-                        labels = {f"בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:34]}": r["מזהה"]
-                                  for _, r in open_sub.iterrows()}
+                        # חיווי 'כבר הגיב' — כדי לא לשלוח מעקב על פריט שכבר התקבל עליו מענה
+                        labels = {}
+                        for _, r in open_sub.iterrows():
+                            mk = "🔵 כבר הגיב · " if r["סטטוס"] == "בטיפול" else ""
+                            labels[f"{mk}בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:30]}"] = r["מזהה"]
                         pk = st.selectbox("פריט", list(labels), key=f"pk_{sel}_{an}",
                                           label_visibility="collapsed")
                         prow = open_sub[open_sub["מזהה"] == labels[pk]].iloc[0].to_dict()

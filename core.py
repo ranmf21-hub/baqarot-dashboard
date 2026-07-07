@@ -38,10 +38,15 @@ STATUS_COLORS = {
 STATUS_MIGRATE = {"פתוח": "נשלח", "נצפה": "בטיפול", "התקבל מענה": "בטיפול"}
 
 
+def followup_tag(req, line) -> str:
+    """תגית-מזהה בנושא המייל — הסורק מחלץ אותה מהתשובה כדי לקשר לממצא המדויק."""
+    return f"[#{str(req).strip()}-{str(line).strip()}]"
+
+
 def _followup_subject_body(row):
     g = (lambda k: str(row.get(k, "") or ""))
     req, line = g("מספר בקשה"), g("שורה")
-    subj = f"מעקב בקרת קטלוג — בקשה {req} שורה {line}"
+    subj = f"מעקב בקרת קטלוג — בקשה {req} שורה {line} {followup_tag(req, line)}"
     body = (
         "שלום,\n\n"
         "בהמשך לבקרת הקטלוג השוטפת, נא לאשר את הטיפול בפריט הבא:\n\n"
