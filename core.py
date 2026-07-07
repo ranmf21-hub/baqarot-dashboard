@@ -89,7 +89,7 @@ def _cta(bulk=False):
     return (
         '<div style="background:#FFF8E1;border-right:5px solid #F5A623;border-radius:8px;'
         'padding:15px 18px;margin:20px 0;">'
-        '<div style="font-size:17px;font-weight:bold;color:#B26A00;">❓ האם הפריט טופל?</div>'
+        '<div style="font-size:17px;font-weight:bold;color:#B26A00;">האם הפריט טופל?</div>'
         f'<div style="font-size:14px;color:#444;margin-top:7px;">נא להשיב {per} עם אחת התשובות: '
         '<span style="background:#E8F5E9;color:#1a7f37;font-weight:bold;padding:2px 10px;border-radius:12px;">טופל</span>'
         '&nbsp;&nbsp;<span style="background:#FDECEA;color:#C00000;font-weight:bold;padding:2px 10px;border-radius:12px;">עדיין בטיפול</span>'
@@ -117,9 +117,10 @@ def _email_shell(intro, inner, bulk=False):
 
 
 def _detail_row(lbl, val):
-    return (f'<tr><td style="padding:9px 13px;background:#f4f6f8;font-weight:bold;width:120px;'
-            f'border:1px solid #e3e7ec;color:#333;">{lbl}</td>'
-            f'<td style="padding:9px 13px;border:1px solid #e3e7ec;color:#222;">{val}</td></tr>')
+    return (f'<tr><td style="padding:9px 13px;background:#f4f6f8;font-weight:bold;width:110px;'
+            f'border:1px solid #e3e7ec;color:#333;white-space:nowrap;">{lbl}</td>'
+            f'<td style="padding:9px 13px;border:1px solid #e3e7ec;color:#222;'
+            f'word-break:break-word;">{val}</td></tr>')
 
 
 def _followup_html(row):
@@ -129,8 +130,8 @@ def _followup_html(row):
     rows = (_detail_row("מספר בקשה", g("מספר בקשה")) + _detail_row("שורה", g("שורה")) +
             _detail_row('מק"ט', g("מקט")) + _detail_row("תיאור הפריט", g("תיאור")) +
             _detail_row("הבעיה שנמצאה", issue))
-    inner = ('<table style="width:100%;border-collapse:collapse;font-size:14px;'
-             f'box-shadow:0 1px 4px rgba(0,0,0,.06);">{rows}</table>')
+    inner = ('<table style="border-collapse:collapse;font-size:14px;width:470px;max-width:100%;'
+             f'table-layout:fixed;box-shadow:0 1px 4px rgba(0,0,0,.06);">{rows}</table>')
     return _email_shell("בבקרת הקטלוג השוטפת נמצא ליקוי בפריט שקטלגת. נבקש לאשר את סטטוס הטיפול:", inner)
 
 
