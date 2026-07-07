@@ -49,8 +49,8 @@ CSS = """
 """
 st.markdown(CSS, unsafe_allow_html=True)
 PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0b0e13", plot_bgcolor="#0b0e13")
-STATUS_BADGE = {"נשלח": "🟡 נשלח", "התקבל מענה": "🔵 התקבל מענה",
-                "בטיפול": "🟡 בטיפול", "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
+STATUS_BADGE = {"נשלח": "🟡 נשלח", "בטיפול": "🔵 בטיפול",
+                "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
 
 
 def rtl_title(text: str) -> dict:
@@ -248,7 +248,7 @@ tab_period, tab_over, tab_manage, tab_ingest, tab_ship, tab_prod = st.tabs(
     ["📄 לפי תקופה", "📊 סקירה", "📋 ניהול ממצאים (הכל)", "📥 קליטה בגרירה", "✉️ משלוחים", "📈 תפוקה"])
 
 # ---------- לפי תקופה — מסך הניהול הראשי, בנוי לפי שלבי התהליך ----------
-# התהליך: פריקת קובץ → מייל נשלח (אוטומטית) → ממתין למענה → התקבל מענה (לאימות) → בטיפול → טופל.
+# התהליך: פריקת קובץ → מייל נשלח (אוטומטית) → ממתין → בטיפול (מעקב/בעבודה) → טופל.
 # יחידת הניהול = אנליסט (כל מייל = חבילת ממצאים לאנליסט אחד) — לכן כרטיס לכל אנליסט.
 with tab_period:
     if f_all.empty:
@@ -262,7 +262,6 @@ with tab_period:
 
         # --- שלב 1: איפה התהליך עומד — פס-התקדמות לפי שלבי התהליך ---
         n_wait = int((act["סטטוס"] == "נשלח").sum())
-        n_reply = int((act["סטטוס"] == "התקבל מענה").sum())
         n_prog = int((act["סטטוס"] == "בטיפול").sum())
         n_done = int((act["סטטוס"] == "טופל").sum())
         n_irr = int((act["סטטוס"] == "לא רלוונטי").sum())   # נדחה — לא ממצא אמיתי (נפרד מ'טופל')
@@ -274,8 +273,8 @@ with tab_period:
                     f"{act['אנליסט'].nunique()} אנליסטים</div>", unsafe_allow_html=True)
 
         # שלבי-התהליך העיקריים (זורמים מימין לשמאל), ואז קופסאות-קצה נפרדות
-        stages = [(n_wait, "ממתין למענה", "#f59e0b"), (n_reply, "התקבל מענה — לבדיקה", "#38bdf8"),
-                  (n_prog, "בטיפול", "#eab308"), (n_done, "טופל", "#22c55e")]
+        stages = [(n_wait, "ממתין", "#f59e0b"), (n_prog, "בטיפול", "#38bdf8"),
+                  (n_done, "טופל", "#22c55e")]
 
         def _box(v, t, c, txt="#8b93a3"):
             dim = "opacity:.4;" if v == 0 else ""
@@ -304,11 +303,13 @@ with tab_period:
 
         # --- שלב 2: ניהול לפי אנליסט — כרטיס לכל מי שקיבל מייל ---
         st.markdown("#### 👤 ניהול לפי אנליסט — כל כרטיס = מייל אחד שנשלח")
-        st.markdown("<div class='note'>פתח כרטיס ⟵ שנה סטטוס לכל בעיה (נשלח / התקבל מענה / בטיפול / טופל) ⟵ שמור. "
-                    "או השתמש בכפתורים המהירים כשכל הפריטים של האנליסט מתקדמים יחד.</div>",
+        st.markdown("<div class='note'>ליד כל שורה יש 📧 <b>שאל אם טופל</b> — לחיצה פותחת מייל-מעקב מוכן "
+                    "(נוסח קבוע) לאותו פריט; שלח אותו, וכשמאשרים — סמן בעמודת הסטטוס 'טופל' ושמור.</div>",
                     unsafe_allow_html=True)
 
-        EDIT_COLS = ["סטטוס", "סוג ממצא", "מספר בקשה", "מקט", "תיאור", "נמצא", "צפוי", "הערה", "מזהה"]
+        # 'מעקב' (mailto) מוצג כעמודת-קישור; 'סטטוס'/'הערה' ניתנות לעריכה; השאר לקריאה
+        SHOW = ["מעקב", "סטטוס", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
+                "נמצא", "צפוי", "הערה", "מזהה"]
         order = (act.assign(_open=~act["סטטוס"].isin(core.CLOSED_STATUSES))
                  .groupby("אנליסט")["_open"].sum().sort_values(ascending=False))
         for an in order.index:
@@ -320,35 +321,36 @@ with tab_period:
             elif late_an:
                 icon, state = "🔴", f"{late_an} באיחור"
             elif (sub["סטטוס"].isin(core.REPLIED_STATUSES)).any():
-                icon, state = "🔵", "התקבל מענה"
+                icon, state = "🔵", "בטיפול"
             else:
-                icon, state = "🟡", "ממתין למענה"
+                icon, state = "🟡", "ממתין"
             label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total} · {state}"
             with st.expander(label, expanded=bool(late_an)):
+                disp = sub.copy()
+                disp["מעקב"] = disp.apply(core.followup_mailto, axis=1)
                 ed = st.data_editor(
-                    sub[EDIT_COLS].sort_values("סוג ממצא"),
+                    disp[SHOW].sort_values("סטטוס"),
                     hide_index=True, use_container_width=True,
-                    disabled=[c for c in EDIT_COLS if c not in ("סטטוס", "הערה")],
+                    disabled=[c for c in SHOW if c not in ("סטטוס", "הערה")],
                     column_config={
+                        "מעקב": st.column_config.LinkColumn("מעקב", display_text="📧 שאל אם טופל",
+                                                             width="small"),
                         "סטטוס": st.column_config.SelectboxColumn("סטטוס", options=core.STATUSES,
-                                                                   width="medium"),
+                                                                   width="small"),
                         "הערה": st.column_config.TextColumn("הערה", width="medium"),
                         "מזהה": None,
                     }, key=f"an_ed_{sel}_{an}")
-                b1, b2, b3 = st.columns(3)
-                if b1.button("📩 התקבל מענה", use_container_width=True, key=f"fb_{sel}_{an}",
-                             help="האנליסט ענה — כל הממתינים שלו יסומנו 'התקבל מענה' (לאימותך) עם תאריך היום"):
-                    ids = sub[sub["סטטוס"] == "נשלח"]["מזהה"].tolist()
-                    update_findings({i: {"סטטוס": "התקבל מענה", "חיווי בתאריך": core.today_str(),
-                                         "מקור חיווי": "ידני"} for i in ids}, "feedback")
-                    persist()
-                    st.session_state.flash = f"סומן 'התקבל מענה' ל-{len(ids)} ממצאים של {an}"
-                    st.rerun()
+                open_sub = sub[~sub["סטטוס"].isin(core.CLOSED_STATUSES)]
+                b1, b2, b3 = st.columns([1.4, 1, 1])
+                with b1:
+                    if len(open_sub) and sub["נמען"].iloc[0]:
+                        st.link_button(f"📧 מייל מעקב לכל הפתוחים ({len(open_sub)})",
+                                       core.followup_mailto_bulk(open_sub, sub["נמען"].iloc[0]),
+                                       use_container_width=True)
                 if b2.button("✅ הכל טופל", use_container_width=True, key=f"done_{sel}_{an}",
                              help="כל הממצאים הפתוחים של האנליסט יסומנו 'טופל'"):
-                    open_rows = sub[~sub["סטטוס"].isin(core.CLOSED_STATUSES)]
                     edits = {}
-                    for _, r in open_rows.iterrows():
+                    for _, r in open_sub.iterrows():
                         e = {"סטטוס": "טופל"}
                         if not r["חיווי בתאריך"]:
                             e.update({"חיווי בתאריך": core.today_str(), "מקור חיווי": "ידני"})
@@ -357,14 +359,13 @@ with tab_period:
                     persist()
                     st.session_state.flash = f"סומנו {len(edits)} ממצאים של {an} כטופלו"
                     st.rerun()
-                if b3.button("💾 שמור שינויים", type="primary", use_container_width=True,
-                             key=f"sv_{sel}_{an}"):
+                if b3.button("💾 שמור", type="primary", use_container_width=True, key=f"sv_{sel}_{an}"):
                     edits = {}
                     for _, r in ed.iterrows():
                         e = {"סטטוס": r["סטטוס"], "הערה": r["הערה"]}
-                        # מעבר ידני לסטטוס שאחרי-מענה בלי חיווי — משלים תאריך אוטומטית
+                        # מעבר ידני ל'בטיפול'/'טופל' בלי חיווי — משלים תאריך אוטומטית
                         old = sub.loc[sub["מזהה"] == r["מזהה"], "חיווי בתאריך"]
-                        if r["סטטוס"] in ("התקבל מענה", "בטיפול", "טופל") and not (len(old) and old.iloc[0]):
+                        if r["סטטוס"] in ("בטיפול", "טופל") and not (len(old) and old.iloc[0]):
                             e.update({"חיווי בתאריך": core.today_str(), "מקור חיווי": "ידני"})
                         edits[r["מזהה"]] = e
                     changed = update_findings(edits, "edit")
@@ -575,7 +576,7 @@ with tab_ingest:
                                 parsed = core.parse_upload(item["קובץ"], fh.read())
                             if parsed.get("kind") == "mail":
                                 res = core.apply_mail(led, parsed)
-                                tag = "תשובה→התקבל מענה" if res["mail_type"] == "מענה" else "משלוח"
+                                tag = "תשובה→בטיפול" if res["mail_type"] == "מענה" else "משלוח"
                                 logs.append(f"✉️ {item['קובץ']}: {tag} — {res['touched']} ממצאים"
                                             + (f" ⚠️ {res['note']}" if res.get("note") else ""))
                             else:
