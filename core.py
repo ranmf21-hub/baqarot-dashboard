@@ -78,29 +78,105 @@ def followup_mailto_bulk(sub, to) -> str:
     return f"mailto:{to}?subject={q(subj)}&body={q(body)}"
 
 
-def _make_eml(to, subj, body) -> bytes:
-    """בונה קובץ .eml עם X-Unsent:1 — נפתח ישירות בחלון-כתיבה של Outlook שולחן-העבודה,
-    ללא תלות בתוכנת ברירת-המחדל של הדפדפן. פשוט לפתוח את הקובץ שהורד."""
+def _esc(v):
+    import html as _h
+    return _h.escape(str(v if v is not None else ""))
+
+
+def _cta(bulk=False):
+    """קופסת הקריאה-לפעולה: 'האם טופל?' עם הדגשה שצריך להשיב."""
+    per = "ליד כל פריט" if bulk else "למייל זה"
+    return (
+        '<div style="background:#FFF8E1;border-right:5px solid #F5A623;border-radius:8px;'
+        'padding:15px 18px;margin:20px 0;">'
+        '<div style="font-size:17px;font-weight:bold;color:#B26A00;">❓ האם הפריט טופל?</div>'
+        f'<div style="font-size:14px;color:#444;margin-top:7px;">נא להשיב {per} עם אחת התשובות: '
+        '<span style="background:#E8F5E9;color:#1a7f37;font-weight:bold;padding:2px 10px;border-radius:12px;">טופל</span>'
+        '&nbsp;&nbsp;<span style="background:#FDECEA;color:#C00000;font-weight:bold;padding:2px 10px;border-radius:12px;">עדיין בטיפול</span>'
+        '<br/><span style="color:#777;">אם עדיין בטיפול — נא לפרט מה חסר / מתי צפוי להסתיים.</span></div></div>'
+    )
+
+
+def _email_shell(intro, inner, bulk=False):
+    return (
+        '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>'
+        '<body style="font-family:Arial,\'Segoe UI\',sans-serif;direction:rtl;margin:0;'
+        'padding:20px;background:#eef1f4;">'
+        '<div style="max-width:660px;margin:auto;background:#fff;border-radius:10px;'
+        'overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">'
+        '<div style="background:#2C3E50;color:#fff;padding:16px 22px;font-size:18px;'
+        'font-weight:bold;">📋 מעקב בקרת קטלוג — בקשה לאישור טיפול</div>'
+        '<div style="padding:22px;">'
+        '<p style="font-size:15px;color:#333;margin:0 0 6px;">שלום,</p>'
+        f'<p style="font-size:15px;color:#333;margin:0 0 14px;">{intro}</p>'
+        f'{inner}{_cta(bulk)}'
+        '<p style="font-size:13px;color:#888;margin-top:26px;border-top:1px solid #eee;'
+        'padding-top:10px;">בברכה,<br/>צוות בקרת הקטלוג</p>'
+        '</div></div></body></html>'
+    )
+
+
+def _detail_row(lbl, val):
+    return (f'<tr><td style="padding:9px 13px;background:#f4f6f8;font-weight:bold;width:120px;'
+            f'border:1px solid #e3e7ec;color:#333;">{lbl}</td>'
+            f'<td style="padding:9px 13px;border:1px solid #e3e7ec;color:#222;">{val}</td></tr>')
+
+
+def _followup_html(row):
+    g = (lambda k: _esc(row.get(k, "")))
+    issue = (f'{g("סוג ממצא")} — נמצא <b style="color:#C00000;">{g("נמצא")}</b>, '
+             f'צפוי <b style="color:#1a7f37;">{g("צפוי")}</b>')
+    rows = (_detail_row("מספר בקשה", g("מספר בקשה")) + _detail_row("שורה", g("שורה")) +
+            _detail_row('מק"ט', g("מקט")) + _detail_row("תיאור הפריט", g("תיאור")) +
+            _detail_row("הבעיה שנמצאה", issue))
+    inner = ('<table style="width:100%;border-collapse:collapse;font-size:14px;'
+             f'box-shadow:0 1px 4px rgba(0,0,0,.06);">{rows}</table>')
+    return _email_shell("בבקרת הקטלוג השוטפת נמצא ליקוי בפריט שקטלגת. נבקש לאשר את סטטוס הטיפול:", inner)
+
+
+def _bulk_html(sub):
+    th = ('style="background:#2C3E50;color:#fff;padding:9px 11px;font-size:13px;'
+          'border:1px solid #223;font-weight:bold;"')
+    td = 'style="padding:8px 11px;border:1px solid #e3e7ec;font-size:13px;color:#222;text-align:center;"'
+    tdr = 'style="padding:8px 11px;border:1px solid #e3e7ec;font-size:13px;color:#222;text-align:right;"'
+    body = ""
+    for _, r in sub.iterrows():
+        g = (lambda k: _esc(r.get(k, "")))
+        body += (f'<tr><td {td}>{g("מספר בקשה")}</td><td {td}>{g("שורה")}</td>'
+                 f'<td {td}>{g("מקט")}</td><td {tdr}>{g("תיאור")}</td>'
+                 f'<td {td} style="color:#C00000;font-weight:bold;border:1px solid #e3e7ec;'
+                 f'padding:8px 11px;font-size:13px;">{g("סוג ממצא")}</td></tr>')
+    inner = ('<table style="width:100%;border-collapse:collapse;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+             f'<tr><th {th}>מס\' בקשה</th><th {th}>שורה</th><th {th}>מק"ט</th>'
+             f'<th {th}>תיאור הפריט</th><th {th}>הבעיה</th></tr>{body}</table>')
+    return _email_shell("בבקרת הקטלוג נמצאו הליקויים הבאים בפריטים שקטלגת. "
+                        "נבקש לאשר את סטטוס הטיפול בכל אחד:", inner, bulk=True)
+
+
+def _make_eml(to, subj, plain, html) -> bytes:
+    """בונה .eml מעוצב (HTML) עם X-Unsent:1 — נפתח ישירות בחלון-כתיבה של Outlook שולחן-העבודה,
+    ללא תלות בתוכנת ברירת-המחדל של הדפדפן. גרסת-טקסט פשוטה כגיבוי."""
     from email.message import EmailMessage
     msg = EmailMessage()
     if to:
         msg["To"] = to
     msg["Subject"] = subj
-    msg["X-Unsent"] = "1"          # הדגל שגורם ל-Outlook לפתוח כטיוטה ניתנת-לעריכה ולשליחה
-    msg.set_content(body)          # UTF-8 (עברית) מקודד אוטומטית
+    msg["X-Unsent"] = "1"                    # הדגל שגורם ל-Outlook לפתוח כטיוטה לעריכה ושליחה
+    msg.set_content(plain)                   # text/plain (גיבוי)
+    msg.add_alternative(html, subtype="html")  # text/html (מוצג ב-Outlook)
     return msg.as_bytes()
 
 
 def followup_eml(row) -> bytes:
-    """טיוטת Outlook (.eml) לפריט בודד."""
-    subj, body = _followup_subject_body(row)
-    return _make_eml(str(row.get("נמען", "") or ""), subj, body)
+    """טיוטת Outlook מעוצבת (.eml) לפריט בודד."""
+    subj, plain = _followup_subject_body(row)
+    return _make_eml(str(row.get("נמען", "") or ""), subj, plain, _followup_html(row))
 
 
 def followup_eml_bulk(sub, to) -> bytes:
-    """טיוטת Outlook (.eml) לכל הפריטים הפתוחים של אנליסט."""
-    subj, body = _bulk_subject_body(sub)
-    return _make_eml(to, subj, body)
+    """טיוטת Outlook מעוצבת (.eml) לכל הפריטים הפתוחים של אנליסט."""
+    subj, plain = _bulk_subject_body(sub)
+    return _make_eml(to, subj, plain, _bulk_html(sub))
 
 
 def migrate_statuses(df):
