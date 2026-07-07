@@ -83,45 +83,44 @@ def _esc(v):
     return _h.escape(str(v if v is not None else ""))
 
 
-# --- מיילי-מעקב בפריסת-טבלאות תואמת-Outlook ---
-# Outlook (מנוע Word) מתעלם מ-max-width / margin:auto / border-radius / box-shadow.
-# לכן: פריסה בטבלאות עם width כתכונת-HTML (לא CSS), מרכוז דרך align=center של תא-האב,
-# ו-RTL דרך dir="rtl" + text-align:right. כך הכרטיס נשאר ברוחב-קבוע ולא נמרח לרוחב המלא.
+# --- מיילי-מעקב: תואם-Outlook, טקסט תקין ---
+# שני כללים חשובים ל-Outlook (מנוע Word):
+#  1) מתעלם מ-max-width/margin:auto → מרכוז ורוחב-קבוע דרך טבלה חיצונית (align=center) + width כתכונה.
+#  2) tekst משתבש כשמשתמשים ב-dir="rtl" כתכונת-HTML על טבלאות → משתמשים ב-CSS direction:rtl בלבד.
 _FONT = "font-family:Arial,'Segoe UI',sans-serif;"
+_RTL = "direction:rtl;text-align:right;"
 CARD_W = 600
 
 
 def _cta(bulk=False):
     per = "ליד כל פריט" if bulk else "למייל זה"
     return (
-        '<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" border="0" '
-        'style="margin:18px 0;"><tr>'
-        '<td style="background:#FFF8E1;border-right:5px solid #F5A623;padding:14px 18px;'
-        f'text-align:right;{_FONT}">'
+        '<div style="background:#FFF8E1;border-right:5px solid #F5A623;padding:14px 18px;'
+        f'margin:18px 0;{_RTL}{_FONT}">'
         '<div style="font-size:17px;font-weight:bold;color:#B26A00;">האם הפריט טופל?</div>'
         f'<div style="font-size:14px;color:#444444;margin-top:7px;">נא להשיב {per} עם אחת התשובות: '
         '<span style="background:#E8F5E9;color:#1a7f37;font-weight:bold;padding:2px 10px;">טופל</span>'
         '&nbsp;&nbsp;<span style="background:#FDECEA;color:#C00000;font-weight:bold;padding:2px 10px;">עדיין בטיפול</span>'
-        '<br><span style="color:#777777;">אם עדיין בטיפול — נא לפרט מה חסר.</span></div>'
-        '</td></tr></table>'
+        '<br><span style="color:#777777;">אם עדיין בטיפול — נא לפרט מה חסר.</span></div></div>'
     )
 
 
 def _email_shell(intro, inner, bulk=False):
     return (
-        '<html dir="rtl"><head><meta charset="UTF-8"></head>'
-        '<body dir="rtl" style="margin:0;padding:0;background:#eef1f4;">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
-        'style="background:#eef1f4;"><tr><td align="center" style="padding:20px 10px;">'
-        f'<table role="presentation" dir="rtl" width="{CARD_W}" cellpadding="0" cellspacing="0" border="0" '
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>'
+        f'<body style="margin:0;padding:0;background:#eef1f4;{_RTL}{_FONT}">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef1f4;">'
+        '<tr><td align="center" style="padding:20px 10px;">'
+        f'<table width="{CARD_W}" cellpadding="0" cellspacing="0" border="0" '
         f'style="width:{CARD_W}px;background:#ffffff;border:1px solid #dfe3e8;">'
         f'<tr><td style="background:#2C3E50;color:#ffffff;padding:15px 22px;{_FONT}font-size:18px;'
-        'font-weight:bold;text-align:right;">מעקב בקרת קטלוג &mdash; בקשה לאישור טיפול</td></tr>'
-        f'<tr><td style="padding:20px 22px;{_FONT}font-size:15px;color:#333333;text-align:right;">'
+        f'font-weight:bold;{_RTL}">מעקב בקרת קטלוג — בקשה לאישור טיפול</td></tr>'
+        f'<tr><td style="padding:20px 22px;{_FONT}font-size:15px;color:#333333;{_RTL}">'
         '<div style="margin:0 0 6px;">שלום,</div>'
         f'<div style="margin:0 0 14px;">{intro}</div>'
         f'{inner}{_cta(bulk)}'
-        f'<div style="margin-top:24px;padding-top:10px;border-top:1px solid #eeeeee;'
+        '<div style="margin-top:24px;padding-top:10px;border-top:1px solid #eeeeee;'
         'font-size:13px;color:#888888;">בברכה,<br>צוות בקרת הקטלוג</div>'
         '</td></tr></table></td></tr></table></body></html>'
     )
@@ -130,9 +129,9 @@ def _email_shell(intro, inner, bulk=False):
 def _detail_row(lbl, val):
     return (f'<tr>'
             f'<td width="105" style="width:105px;padding:9px 13px;background:#f4f6f8;font-weight:bold;'
-            f'border:1px solid #e3e7ec;color:#333333;text-align:right;{_FONT}font-size:14px;">{lbl}</td>'
-            f'<td style="padding:9px 13px;border:1px solid #e3e7ec;color:#222222;text-align:right;'
-            f'{_FONT}font-size:14px;">{val}</td></tr>')
+            f'border:1px solid #e3e7ec;color:#333333;{_RTL}{_FONT}font-size:14px;">{lbl}</td>'
+            f'<td style="padding:9px 13px;border:1px solid #e3e7ec;color:#222222;'
+            f'{_RTL}{_FONT}font-size:14px;">{val}</td></tr>')
 
 
 def _followup_html(row):
@@ -142,10 +141,9 @@ def _followup_html(row):
     rows = (_detail_row("מספר בקשה", g("מספר בקשה")) + _detail_row("שורה", g("שורה")) +
             _detail_row('מק"ט', g("מקט")) + _detail_row("תיאור הפריט", g("תיאור")) +
             _detail_row("הבעיה שנמצאה", issue))
-    # רוחב-קבוע 430, מיושר לימין דרך align="right" (לא נמרח לרוחב הכרטיס)
-    inner = ('<table role="presentation" dir="rtl" align="right" width="430" cellpadding="0" '
-             f'cellspacing="0" border="0" style="width:430px;border-collapse:collapse;">{rows}</table>'
-             '<div style="clear:both;font-size:0;line-height:0;">&nbsp;</div>')
+    # רוחב-קבוע 440 (לא נמרח), RTL דרך CSS בלבד (בלי dir="rtl" שמשבש ב-Outlook)
+    inner = ('<table width="440" cellpadding="0" cellspacing="0" border="0" '
+             f'style="width:440px;border-collapse:collapse;{_RTL}">{rows}</table>')
     return _email_shell("בבקרת הקטלוג השוטפת נמצא ליקוי בפריט שקטלגת. נבקש לאשר את סטטוס הטיפול:", inner)
 
 
@@ -161,8 +159,8 @@ def _bulk_html(sub):
         g = (lambda k: _esc(r.get(k, "")))
         body += (f'<tr><td {td}>{g("מספר בקשה")}</td><td {td}>{g("שורה")}</td>'
                  f'<td {td}>{g("מקט")}</td><td {tdr}>{g("תיאור")}</td><td {tde}>{g("סוג ממצא")}</td></tr>')
-    inner = ('<table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" border="0" '
-             'style="width:100%;border-collapse:collapse;">'
+    inner = ('<table width="100%" cellpadding="0" cellspacing="0" border="0" '
+             f'style="width:100%;border-collapse:collapse;{_RTL}">'
              f'<tr><th {th}>מס\' בקשה</th><th {th}>שורה</th><th {th}>מק"ט</th>'
              f'<th {th}>תיאור הפריט</th><th {th}>הבעיה</th></tr>{body}</table>')
     return _email_shell("בבקרת הקטלוג נמצאו הליקויים הבאים בפריטים שקטלגת. "
@@ -178,8 +176,8 @@ def _make_eml(to, subj, plain, html) -> bytes:
         msg["To"] = to
     msg["Subject"] = subj
     msg["X-Unsent"] = "1"                    # הדגל שגורם ל-Outlook לפתוח כטיוטה לעריכה ושליחה
-    msg.set_content(plain)                   # text/plain (גיבוי)
-    msg.add_alternative(html, subtype="html")  # text/html (מוצג ב-Outlook)
+    msg.set_content(plain, cte="base64")                    # text/plain (גיבוי)
+    msg.add_alternative(html, subtype="html", cte="base64")  # base64 יציב יותר ב-Outlook מ-QP
     return msg.as_bytes()
 
 
