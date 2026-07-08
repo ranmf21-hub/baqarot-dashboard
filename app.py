@@ -76,6 +76,19 @@ CSS = """
   .stButton button:hover, .stDownloadButton button:hover { border-color:var(--border-hi); }
   hr { border-color:var(--border); margin:14px 0; }
   a { color:var(--accent-hi); }
+  /* אכיפת התֵמה דרך CSS — לא תלוי ב-config.toml של Streamlit Cloud */
+  .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
+      background:#0a0b0d !important; }
+  [data-testid="stHeader"] { background:rgba(10,11,13,0.55) !important; }
+  section[data-testid="stSidebar"] { background:#0d0e11 !important; }
+  /* כפתור ראשי — אינדיגו Linear (אכיפה) */
+  button[kind="primary"], [data-testid="baseButton-primary"],
+  .stButton button[kind="primary"], .stDownloadButton button[kind="primary"] {
+      background:#5e6ad2 !important; border:1px solid #5e6ad2 !important; color:#ffffff !important; }
+  button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {
+      background:#6b76dd !important; }
+  /* קו-אקסנט אינדיגו על הטאב הפעיל */
+  .stTabs [aria-selected="true"] { border-bottom:2px solid #5e6ad2 !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
