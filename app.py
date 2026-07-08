@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 30</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 31</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -358,7 +358,7 @@ st.markdown(
 
 tab_period, tab_over, tab_manage, tab_ingest, tab_ship, tab_prod = st.tabs(
     ["📄 לפי תקופה", "📊 סקירה", "📋 ניהול ממצאים (הכל)", "📥 קליטה בגרירה",
-     "📩 תשובות ומשלוחים", "📈 תפוקה"])
+     "📬 שליחת מיילים ותשובות", "📈 תפוקה"])
 
 # ---------- לפי תקופה — מסך הניהול הראשי, בנוי לפי שלבי התהליך ----------
 # התהליך: פריקת קובץ → מייל נשלח (אוטומטית) → ממתין → בטיפול (מעקב/בעבודה) → טופל.
@@ -761,116 +761,198 @@ with tab_ingest:
                     st.session_state.scan_results = None
                     st.rerun()
 
-# ---------- תשובות ומשלוחים — המקום המרכזי שאוסף את כל התשובות ----------
+# ---------- שליחת מיילים ותשובות — מוקד-התשובות, ממוקד-מייל (מקור-אמת: הממצאים) ----------
 with tab_ship:
-    # --- תור-אימות: הדבר היחיד שדורש מבט אנושי. השאר נסגר/מסווג אוטומטית מהתשובה ---
-    if not f_all.empty:
-        auto_done = f_all[(f_all["מקור חיווי"].astype(str) == "מייל (אוטומטי)")
-                          & (f_all["סטטוס"] == "טופל")]
-        needs = f_all[f_all["הערה"].astype(str).str.contains("דרוש אימות", na=False)
-                      & ~f_all["סטטוס"].isin(core.CLOSED_STATUSES)]
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f"<div class='kpi green'><div class='v'>{len(auto_done)}</div>"
-                    "<div class='t'>✓ נסגרו אוטומטית מתשובה</div></div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='kpi orange'><div class='v'>{len(needs)}</div>"
-                    "<div class='t'>⚠ דרוש אימות ידני</div></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='kpi blue'><div class='v'>"
-                    f"{int((f_all['מקור חיווי'].astype(str)=='מייל (אוטומטי)').sum())}</div>"
-                    "<div class='t'>📩 תשובות שנקלטו</div></div>", unsafe_allow_html=True)
-        if len(needs):
-            st.markdown("#### 🔎 דרוש אימות ידני — הסורק לא היה בטוח בסיווג")
-            st.caption("רק אלה דורשים את מבטך. השאר טופל/סווג אוטומטית לפי תשובת האנליסט.")
-            nv = needs.copy()
-            nv["תשובת האנליסט"] = (nv["הערה"].astype(str)
-                                   .str.replace(r".*תשובה:\s*", "", regex=True).str.strip())
-            st.dataframe(nv[["אנליסט", "מספר בקשה", "שורה", "מקט", "תיאור", "תשובת האנליסט"]],
-                         use_container_width=True, hide_index=True)
-            st.caption("לסגירה/שינוי: טאב 'לפי תקופה' → כרטיס האנליסט → סמן 'טופל'/'בטיפול' ושמור.")
-        st.markdown("---")
-
-    st.markdown("### 📩 תשובות שהתקבלו")
-    st.caption("כל מה שהאנליסטים השיבו (אוטומטית מסורק-התשובות, או מגרירת מייל) — לפי בקשה ואנליסט. "
-               "תשובת 'טופל' ברורה → נסגר לבד; 'עדיין' → בטיפול; לא-בטוח → תור-האימות למעלה.")
+    st.caption("מוקד-התשובות: כל מייל שנשלח = כרטיס אחד, והפריטים שבו מתחתיו. "
+               "הסטטוס נגזר תמיד מגיליון-הממצאים (לא מהיומן).")
     if f_all.empty:
-        rep = f_all
+        st.info("עדיין אין נתונים — גרור ריצה בטאב 'קליטה בגרירה' או הרץ את הסורקים.")
     else:
-        has_reply = (f_all["מקור חיווי"].astype(str).isin(["מייל", "מייל (אוטומטי)"])
-                     | f_all["הערה"].astype(str).str.contains("תשובה:", na=False))
-        rep = f_all[has_reply]
-    if rep.empty:
-        st.info("עדיין לא נקלטו תשובות. כשהאנליסטים משיבים והסורק רץ (או כשגוררים מייל-תשובה) — "
-                "הן יופיעו כאן והממצא יעבור ל'בטיפול'.")
-    else:
-        auto = int((rep["מקור חיווי"].astype(str) == "מייל (אוטומטי)").sum())
-        st.markdown(f"<div class='note'><b>{len(rep)}</b> ממצאים שהתקבלה עליהם תשובה "
-                    f"({auto} אוטומטית מהסורק) · {rep['אנליסט'].nunique()} אנליסטים · "
-                    f"{int(rep['סטטוס'].isin(core.CLOSED_STATUSES).sum())} כבר נסגרו</div>",
-                    unsafe_allow_html=True)
-        rv = rep.copy()
-        rv["תוכן התשובה"] = (rv["הערה"].astype(str)
-                             .str.replace(r".*תשובה:\s*", "", regex=True).str.strip())
-        cols = ["מצב", "אנליסט", "מספר בקשה", "שורה", "מקט", "סוג ממצא", "תיאור",
-                "חיווי בתאריך", "תוכן התשובה"]
-        rv["מצב"] = rv["סטטוס"].map(STATUS_BADGE).fillna(rv["סטטוס"])
-        st.dataframe(rv[cols].sort_values(["חיווי בתאריך", "אנליסט"], ascending=[False, True]),
-                     use_container_width=True, hide_index=True, height=400)
-        st.caption("לסגירה: עבור לטאב 'לפי תקופה', פתח את כרטיס האנליסט, אמת וסמן 'טופל'.")
+        A = f_all[~f_all["סוג ממצא"].isin(core.SIDE_TYPES)].copy()
+        A["_replied"] = (A["מקור חיווי"].astype(str).isin(["מייל", "מייל (אוטומטי)"])
+                         | A["הערה"].astype(str).str.contains("תשובה:", na=False))
+        A["_open"] = ~A["סטטוס"].isin(core.CLOSED_STATUSES)
+        A["_review"] = (A["הערה"].astype(str).str.contains("דרוש אימות", na=False)) & A["_open"]
+        n_review = int(A["_review"].sum())
+        n_wait = int((A["_open"] & ~A["_replied"] & (A["סטטוס"] == "נשלח")).sum())
+        n_reply_open = int((A["_replied"] & A["_open"]).sum())
+        n_done = int((A["סטטוס"] == "טופל").sum())
+        n_late = int(A["באיחור"].sum())
 
-    # --- מיילים שנשלחו: כל מייל בשורה אחת, עם רשימת הפריטים שבו (מייל→פריטים) ---
-    if not led["shipments"].empty and "סוג" in led["shipments"].columns:
-        sent = led["shipments"][led["shipments"]["סוג"].astype(str).str.contains("נשלח", na=False)]
-        if len(sent):
-            st.markdown("---")
-            st.markdown("### 📤 מיילים שנשלחו — הפריטים שבכל מייל")
-            st.caption("כל שורה = מייל אחד, עם רשימת הפריטים שנכללו בו. כך רואים בדיוק על אילו פריטים נשלח כל מייל.")
-            grp = (sent.assign(פרטים=sent["פרטים"].astype(str))
-                   .groupby(["תאריך", "נמען", "נושא"], sort=False)["פרטים"]
-                   .apply(lambda s: " · ".join([x for x in s if x.strip() and x.lower() != "nan"]) or "—")
-                   .reset_index().rename(columns={"פרטים": "פריטים שבמייל", "נמען": "נשלח אל"}))
-            st.dataframe(grp.iloc[::-1], use_container_width=True, hide_index=True)
+        # רצועת-מצב לחיצה (מחליפה את 3 ה-KPI) — כל מספר מסנן את הכרטיסים
+        opts = {
+            f"⚠ דרוש אימות ({n_review})": "review",
+            f"📩 תשובות לטיפול ({n_reply_open})": "reply",
+            f"⏳ ממתינים לתשובה ({n_wait})": "wait",
+            f"✅ טופלו ({n_done})": "done",
+            f"📋 הכל ({len(A)})": "all",
+        }
+        pick = st.radio("סינון", list(opts), horizontal=True,
+                        index=(0 if n_review else 4), label_visibility="collapsed")
+        mode = opts[pick]
+        if n_late:
+            st.caption(f"🔴 שים לב: {n_late} פריטים באיחור (מעל סף התזכורת).")
 
-    st.markdown("---")
-    st.markdown("### ✉️ יומן מיילים — מה יצא ומה נכנס")
-    st.caption("רישום כרונולוגי דו-כיווני: כל מייל-בקרה שיצא (מסורק ה-Sent) וכל תשובה שנקלטה (מסורק התשובות).")
-    if led["shipments"].empty:
-        st.info("אין רישומים עדיין — יתמלא אוטומטית מסורק-השליחות (Sent) ומסורק-התשובות.")
-    else:
-        sh_df = led["shipments"]
-        if "סוג" in sh_df.columns:
-            vc = sh_df["סוג"].value_counts()
-            sent_c = int(vc.get("מייל-נשלח", 0) + vc.get("מעקב-נשלח", 0) + vc.get("משלוח", 0))
-            reply_c = int(vc.get("מענה", 0))
-            st.markdown(f"<div class='note'>📤 <b>{sent_c}</b> מיילים שיצאו · "
-                        f"📩 <b>{reply_c}</b> סבבי-תשובות · {len(sh_df)} רשומות סה\"כ</div>",
+        # מסננים משניים: אנליסט + חיפוש חופשי
+        fc1, fc2 = st.columns([1, 2])
+        _ans = ["(כל האנליסטים)"] + sorted([a for a in A["אנליסט"].dropna().unique() if str(a).strip()])
+        pick_an = fc1.selectbox("אנליסט", _ans, label_visibility="collapsed")
+        q = fc2.text_input("חיפוש", "", label_visibility="collapsed",
+                           placeholder="🔎 חיפוש: מקט / תיאור / מספר בקשה / טקסט התשובה")
+
+        V = A
+        if mode == "review":
+            V = V[V["_review"]]
+        elif mode == "reply":
+            V = V[V["_replied"] & V["_open"]]
+        elif mode == "wait":
+            V = V[V["_open"] & ~V["_replied"] & (V["סטטוס"] == "נשלח")]
+        elif mode == "done":
+            V = V[V["סטטוס"] == "טופל"]
+        if pick_an != "(כל האנליסטים)":
+            V = V[V["אנליסט"] == pick_an]
+        if q.strip():
+            _hay = (V["מקט"].astype(str) + " " + V["תיאור"].astype(str) + " "
+                    + V["מספר בקשה"].astype(str) + " " + V["הערה"].astype(str))
+            V = V[_hay.str.contains(q.strip(), case=False, na=False, regex=False)]
+
+        if V.empty:
+            st.info("אין פריטים בסינון הזה — נסה 'הכל' או סינון אחר.")
+        else:
+            _ng = V.groupby(["תקופת בקרה", "נמען"]).ngroups
+            st.markdown(f"<div class='note'>{len(V)} פריטים · {_ng} מיילים (כרטיס לכל מייל)</div>",
                         unsafe_allow_html=True)
-        st.dataframe(sh_df.iloc[::-1], use_container_width=True, hide_index=True)
+            SHOWH = ["סטטוס", "מספר בקשה", "שורה", "מקט", "תיאור", "סוג ממצא",
+                     "חיווי בתאריך", "מזהה"]
+            _groups = sorted(V.groupby(["תקופת בקרה", "נמען"]),
+                             key=lambda kv: int(kv[1]["באיחור"].sum()), reverse=True)
+            for (per, recip), g in _groups:
+                an = str(g["אנליסט"].iloc[0]) if len(g) else ""
+                total = len(g)
+                gr_replied = int((g["מקור חיווי"].astype(str).isin(["מייל", "מייל (אוטומטי)"])
+                                  | g["הערה"].astype(str).str.contains("תשובה:", na=False)).sum())
+                gr_done = int(g["סטטוס"].isin(core.CLOSED_STATUSES).sum())
+                gr_review = int((g["הערה"].astype(str).str.contains("דרוש אימות", na=False)
+                                 & ~g["סטטוס"].isin(core.CLOSED_STATUSES)).sum())
+                gr_late = int(g["באיחור"].sum())
+                sent_dt = next((str(d) for d in g["נשלח בתאריך"]
+                                if str(d).strip() and str(d).lower() != "nan"), "—")
+                if gr_review:
+                    lamp = "⚠"
+                elif gr_late:
+                    lamp = "🔴"
+                elif gr_done == total:
+                    lamp = "🟢"
+                elif gr_replied:
+                    lamp = "🔵"
+                else:
+                    lamp = "🟡"
+                extra = f" · ⚠ {gr_review} לאימות" if gr_review else ""
+                label = (f"{lamp} {an or recip or '(ללא נמען)'} · {per} · נשלח {sent_dt} · "
+                         f"מייל אחד · {total} פריטים · 📩 נענו {gr_replied}/{total} · "
+                         f"✅ טופל {gr_done}/{total}{extra}")
+                with st.expander(label, expanded=bool(gr_review or gr_late)):
+                    # תשובת-המלל פעם אחת (מענה אחד מכסה כמה פריטים — dedup)
+                    _reps = []
+                    for _n in g["הערה"]:
+                        s = str(_n)
+                        if "תשובה:" in s:
+                            t = s.split("תשובה:")[-1].strip()
+                            if t and t not in _reps:
+                                _reps.append(t)
+                    if _reps:
+                        st.markdown("**💬 תשובת האנליסט:**")
+                        for _t in _reps[:3]:
+                            st.markdown(
+                                "<div style='background:#141722;border:1px solid #2c3543;"
+                                "border-radius:9px;padding:8px 12px;margin:2px 0;font-size:13px;"
+                                f"color:#cfd4de;white-space:normal'>{_t[:400]}</div>",
+                                unsafe_allow_html=True)
+                    ge = st.data_editor(
+                        g[SHOWH].sort_values("סטטוס"), hide_index=True,
+                        use_container_width=True,
+                        disabled=[c for c in SHOWH if c != "סטטוס"],
+                        column_config={
+                            "סטטוס": st.column_config.SelectboxColumn(
+                                "סטטוס", options=core.STATUSES, width="small"),
+                            "מזהה": None,
+                        }, key=f"ship_ed_{per}_{recip}")
+                    open_g = g[~g["סטטוס"].isin(core.CLOSED_STATUSES)]
+                    bc1, bc2, bc3 = st.columns([2, 1, 1])
+                    if len(open_g) > 1:
+                        bc1.download_button(
+                            f"📧 מייל-מעקב לכל {len(open_g)} הפתוחים",
+                            core.followup_eml_bulk(open_g, recip),
+                            file_name=f"followup_{an or 'analyst'}.eml", mime="message/rfc822",
+                            key=f"ship_dl_{per}_{recip}", use_container_width=True)
+                    elif len(open_g) == 1:
+                        _pr = open_g.iloc[0].to_dict()
+                        bc1.download_button(
+                            "📧 מייל-מעקב לפריט", core.followup_eml(_pr),
+                            file_name=f"followup_{_pr['מספר בקשה']}_{_pr['שורה']}.eml",
+                            mime="message/rfc822", key=f"ship_dl1_{per}_{recip}",
+                            use_container_width=True)
+                    else:
+                        bc1.caption("כל הפריטים נסגרו ✅")
+                    if bc2.button("✅ הכל טופל", key=f"ship_done_{per}_{recip}",
+                                  use_container_width=True, disabled=(len(open_g) == 0)):
+                        _e = {r["מזהה"]: {"סטטוס": "טופל"} for _, r in open_g.iterrows()}
+                        update_findings(_e, "ship-alldone")
+                        persist()
+                        st.session_state.flash = f"סומנו {len(_e)} פריטים כטופלו"
+                        st.rerun()
+                    if bc3.button("💾 שמור", type="primary", key=f"ship_sv_{per}_{recip}",
+                                  use_container_width=True):
+                        _e = {}
+                        for _, r in ge.iterrows():
+                            ee = {"סטטוס": r["סטטוס"]}
+                            old = g.loc[g["מזהה"] == r["מזהה"], "חיווי בתאריך"]
+                            if r["סטטוס"] in ("בטיפול", "טופל") and not (len(old) and str(old.iloc[0]).strip()):
+                                ee.update({"חיווי בתאריך": core.today_str(), "מקור חיווי": "ידני"})
+                            _e[r["מזהה"]] = ee
+                        _ch = update_findings(_e, "ship-edit")
+                        _sv = persist()
+                        st.session_state.flash = (f"עודכנו {_ch} שדות"
+                                                  + ("" if _sv else " — בזיכרון בלבד!"))
+                        st.rerun()
 
-        # --- מחיקת רשומות מהיומן (לניקוי בדיקות) — סימון ✓ ואז מחיקה, נשמר לענן ---
-        with st.expander("🗑️ מחיקת רשומות מהיומן", expanded=False):
-            st.caption("סמן ✓ בעמודת 'מחק' לשורות להסרה, ואז לחץ 'מחק נבחרים'. שימושי לניקוי בדיקות. "
-                       "השורות נמחקות גם מהענן (הסורקים לא יחזירו אותן — הן כבר מסומנות 'נקלט').")
-            _dd = sh_df.copy()
-            _dd.insert(0, "מחק", False)
-            _ed = st.data_editor(
-                _dd.iloc[::-1], use_container_width=True, hide_index=True,
-                disabled=[c for c in _dd.columns if c != "מחק"],
-                column_config={"מחק": st.column_config.CheckboxColumn("מחק", width="small")},
-                key="ship_del")
-            _sel = [i for i in _ed.index if bool(_ed.at[i, "מחק"])]
-            _c1, _c2 = st.columns([1, 3])
-            if _c1.button(f"🗑️ מחק {len(_sel)} נבחרים", type="primary", key="ship_del_btn",
-                          disabled=(len(_sel) == 0)):
-                led["shipments"] = led["shipments"].drop(index=_sel).reset_index(drop=True)
-                _saved = persist()
-                st.session_state.flash = (f"נמחקו {len(_sel)} רשומות מהיומן"
-                                          + ("" if _saved else " — בזיכרון בלבד!"))
-                st.rerun()
-            if _c2.button("🧹 מחק את כל היומן", key="ship_del_all",
-                          help="מוחק את כל הרשומות ביומן המשלוחים (לא נוגע בממצאים)"):
-                led["shipments"] = led["shipments"].iloc[0:0]
-                _saved = persist()
-                st.session_state.flash = "היומן נוקה" + ("" if _saved else " — בזיכרון בלבד!")
-                st.rerun()
+        # --- מגירת מתקדם: יומן גולמי + ניקוי (ביקורת / בדיקות בלבד) ---
+        st.markdown("---")
+        with st.expander("🔧 מתקדם — יומן גולמי וניקוי (ביקורת / בדיקות)", expanded=False):
+            if led["shipments"].empty:
+                st.info("אין רישומים ביומן עדיין.")
+            else:
+                sh_df = led["shipments"]
+                if "סוג" in sh_df.columns:
+                    vc = sh_df["סוג"].value_counts()
+                    _sc = int(vc.get("מייל-נשלח", 0) + vc.get("מעקב-נשלח", 0) + vc.get("משלוח", 0))
+                    _rc = int(vc.get("מענה", 0))
+                    st.markdown(f"<div class='note'>📤 <b>{_sc}</b> מיילים שיצאו · "
+                                f"📩 <b>{_rc}</b> תשובות · {len(sh_df)} רשומות</div>",
+                                unsafe_allow_html=True)
+                st.dataframe(sh_df.iloc[::-1], use_container_width=True, hide_index=True)
+                st.caption("מחיקת רשומות מהיומן (לניקוי בדיקות; לא נוגע בממצאים) — סמן ✓ ומחק:")
+                _dd = sh_df.copy()
+                _dd.insert(0, "מחק", False)
+                _ed = st.data_editor(
+                    _dd.iloc[::-1], use_container_width=True, hide_index=True,
+                    disabled=[c for c in _dd.columns if c != "מחק"],
+                    column_config={"מחק": st.column_config.CheckboxColumn("מחק", width="small")},
+                    key="ship_del")
+                _sel = [i for i in _ed.index if bool(_ed.at[i, "מחק"])]
+                _dc1, _dc2 = st.columns([1, 3])
+                if _dc1.button(f"🗑️ מחק {len(_sel)} נבחרים", type="primary",
+                               key="ship_del_btn", disabled=(len(_sel) == 0)):
+                    led["shipments"] = led["shipments"].drop(index=_sel).reset_index(drop=True)
+                    _sv = persist()
+                    st.session_state.flash = (f"נמחקו {len(_sel)} רשומות"
+                                              + ("" if _sv else " — בזיכרון בלבד!"))
+                    st.rerun()
+                if _dc2.button("🧹 מחק את כל היומן", key="ship_del_all"):
+                    led["shipments"] = led["shipments"].iloc[0:0]
+                    persist()
+                    st.session_state.flash = "היומן נוקה"
+                    st.rerun()
 
 # ---------- תפוקה ----------
 with tab_prod:
