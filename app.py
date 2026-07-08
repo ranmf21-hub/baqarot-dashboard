@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 25</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 26</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -815,12 +815,20 @@ with tab_ship:
         st.caption("לסגירה: עבור לטאב 'לפי תקופה', פתח את כרטיס האנליסט, אמת וסמן 'טופל'.")
 
     st.markdown("---")
-    st.markdown("### ✉️ יומן משלוחים ומענים")
-    st.caption("רישום כרונולוגי של כל מייל שיצא (בפריקה) וכל סבב-תשובות שנקלט.")
+    st.markdown("### ✉️ יומן מיילים — מה יצא ומה נכנס")
+    st.caption("רישום כרונולוגי דו-כיווני: כל מייל-בקרה שיצא (מסורק ה-Sent) וכל תשובה שנקלטה (מסורק התשובות).")
     if led["shipments"].empty:
-        st.info("אין משלוחים רשומים עדיין — יירשמו אוטומטית עם פריקת קובץ / קליטת תשובות.")
+        st.info("אין רישומים עדיין — יתמלא אוטומטית מסורק-השליחות (Sent) ומסורק-התשובות.")
     else:
-        st.dataframe(led["shipments"].iloc[::-1], use_container_width=True, hide_index=True)
+        sh_df = led["shipments"]
+        if "סוג" in sh_df.columns:
+            vc = sh_df["סוג"].value_counts()
+            sent_c = int(vc.get("מייל-נשלח", 0) + vc.get("מעקב-נשלח", 0) + vc.get("משלוח", 0))
+            reply_c = int(vc.get("מענה", 0))
+            st.markdown(f"<div class='note'>📤 <b>{sent_c}</b> מיילים שיצאו · "
+                        f"📩 <b>{reply_c}</b> סבבי-תשובות · {len(sh_df)} רשומות סה\"כ</div>",
+                        unsafe_allow_html=True)
+        st.dataframe(sh_df.iloc[::-1], use_container_width=True, hide_index=True)
 
 # ---------- תפוקה ----------
 with tab_prod:
