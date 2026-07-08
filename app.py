@@ -214,6 +214,9 @@ if st.session_state.get("flash_logs"):
 
 with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
+    st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
+                "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
+                "עיצוב Linear · גרסה 19</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
