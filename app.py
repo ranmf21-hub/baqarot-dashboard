@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 28</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 29</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -422,8 +422,8 @@ with tab_period:
                     "מומלץ <b>📧 טיוטת Outlook</b> — נפתחת ישירות בחלון-כתיבה של Outlook (הורד את הקובץ ופתח אותו). "
                     "כשמאשרים לך — סמן 'טופל' בעמודת הסטטוס ושמור.</div>", unsafe_allow_html=True)
 
-        SHOW = ["סטטוס", "תגובה", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
-                "נמצא", "צפוי", "הערה", "מזהה"]
+        SHOW = ["סטטוס", "תגובה", "נשלח בתאריך", "סוג ממצא", "מספר בקשה", "שורה", "מקט",
+                "תיאור", "נמצא", "צפוי", "הערה", "מזהה"]
 
         def _reply_cell(r):
             """חיווי-תגובה לצד כל פריט: האם התקבלה תשובה / ממתין / דורש אימות."""
@@ -475,6 +475,8 @@ with tab_period:
                                                                    width="small"),
                         "תגובה": st.column_config.TextColumn("תגובה", width="small",
                                                              help="📩 נענה · ⏳ ממתין · ⚠ דרוש אימות"),
+                        "נשלח בתאריך": st.column_config.TextColumn("נשלח", width="small",
+                                                                   help="מתי נשלח מייל על הפריט"),
                         "הערה": st.column_config.TextColumn("הערה", width="medium"),
                         "מזהה": None,
                     }, key=f"an_ed_{sel}_{an}")
@@ -813,6 +815,19 @@ with tab_ship:
         st.dataframe(rv[cols].sort_values(["חיווי בתאריך", "אנליסט"], ascending=[False, True]),
                      use_container_width=True, hide_index=True, height=400)
         st.caption("לסגירה: עבור לטאב 'לפי תקופה', פתח את כרטיס האנליסט, אמת וסמן 'טופל'.")
+
+    # --- מיילים שנשלחו: כל מייל בשורה אחת, עם רשימת הפריטים שבו (מייל→פריטים) ---
+    if not led["shipments"].empty and "סוג" in led["shipments"].columns:
+        sent = led["shipments"][led["shipments"]["סוג"].astype(str).str.contains("נשלח", na=False)]
+        if len(sent):
+            st.markdown("---")
+            st.markdown("### 📤 מיילים שנשלחו — הפריטים שבכל מייל")
+            st.caption("כל שורה = מייל אחד, עם רשימת הפריטים שנכללו בו. כך רואים בדיוק על אילו פריטים נשלח כל מייל.")
+            grp = (sent.assign(פרטים=sent["פרטים"].astype(str))
+                   .groupby(["תאריך", "נמען", "נושא"], sort=False)["פרטים"]
+                   .apply(lambda s: " · ".join([x for x in s if x.strip() and x.lower() != "nan"]) or "—")
+                   .reset_index().rename(columns={"פרטים": "פריטים שבמייל", "נמען": "נשלח אל"}))
+            st.dataframe(grp.iloc[::-1], use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.markdown("### ✉️ יומן מיילים — מה יצא ומה נכנס")
