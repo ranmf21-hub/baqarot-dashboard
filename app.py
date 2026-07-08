@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 22</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 23</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -727,9 +727,34 @@ with tab_ingest:
 
 # ---------- תשובות ומשלוחים — המקום המרכזי שאוסף את כל התשובות ----------
 with tab_ship:
+    # --- תור-אימות: הדבר היחיד שדורש מבט אנושי. השאר נסגר/מסווג אוטומטית מהתשובה ---
+    if not f_all.empty:
+        auto_done = f_all[(f_all["מקור חיווי"].astype(str) == "מייל (אוטומטי)")
+                          & (f_all["סטטוס"] == "טופל")]
+        needs = f_all[f_all["הערה"].astype(str).str.contains("דרוש אימות", na=False)
+                      & ~f_all["סטטוס"].isin(core.CLOSED_STATUSES)]
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f"<div class='kpi green'><div class='v'>{len(auto_done)}</div>"
+                    "<div class='t'>✓ נסגרו אוטומטית מתשובה</div></div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='kpi orange'><div class='v'>{len(needs)}</div>"
+                    "<div class='t'>⚠ דרוש אימות ידני</div></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='kpi blue'><div class='v'>"
+                    f"{int((f_all['מקור חיווי'].astype(str)=='מייל (אוטומטי)').sum())}</div>"
+                    "<div class='t'>📩 תשובות שנקלטו</div></div>", unsafe_allow_html=True)
+        if len(needs):
+            st.markdown("#### 🔎 דרוש אימות ידני — הסורק לא היה בטוח בסיווג")
+            st.caption("רק אלה דורשים את מבטך. השאר טופל/סווג אוטומטית לפי תשובת האנליסט.")
+            nv = needs.copy()
+            nv["תשובת האנליסט"] = (nv["הערה"].astype(str)
+                                   .str.replace(r".*תשובה:\s*", "", regex=True).str.strip())
+            st.dataframe(nv[["אנליסט", "מספר בקשה", "שורה", "מקט", "תיאור", "תשובת האנליסט"]],
+                         use_container_width=True, hide_index=True)
+            st.caption("לסגירה/שינוי: טאב 'לפי תקופה' → כרטיס האנליסט → סמן 'טופל'/'בטיפול' ושמור.")
+        st.markdown("---")
+
     st.markdown("### 📩 תשובות שהתקבלו")
-    st.caption("כאן נאסף כל מה שהאנליסטים השיבו (אוטומטית מסורק-התשובות, או מגרירת מייל) — "
-               "לפי בקשה ואנליסט, כולל תוכן התשובה. הסטטוס נשאר 'בטיפול' עד שתאמת ותסגור ל'טופל'.")
+    st.caption("כל מה שהאנליסטים השיבו (אוטומטית מסורק-התשובות, או מגרירת מייל) — לפי בקשה ואנליסט. "
+               "תשובת 'טופל' ברורה → נסגר לבד; 'עדיין' → בטיפול; לא-בטוח → תור-האימות למעלה.")
     if f_all.empty:
         rep = f_all
     else:
