@@ -24,19 +24,21 @@ CSS = """
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
   :root{
-    --bg:#0d0f15; --surface:#171a22; --surface2:#1e212b; --elev:#262a36;
-    --border:#2a2f3b; --border-hi:#3d4454;
-    --text:#eef0f4; --text2:#99a1af; --text3:#6b7280;
-    --accent:#6b76e8; --accent-hi:#828cf0; --accent-dim:rgba(107,118,232,.18);
-    --green:#4cb782; --amber:#e5a94a; --red:#f06868; --blue:#56aefc; --gray:#6b7280; --indigo:#8b83f0;
+    --bg:#0a0d14; --surface:#151b28; --surface2:#1c2331; --elev:#242c3d;
+    --border:#2c3543; --border-hi:#414d61;
+    --text:#eef1f6; --text2:#98a1b2; --text3:#6b7484;
+    --accent:#6d78ec; --accent-hi:#8791f2; --accent-dim:rgba(109,120,236,.20);
+    --green:#4cc38a; --amber:#e8b04b; --red:#f16a6a; --blue:#5aaefc; --gray:#6b7484; --indigo:#8b83f0;
+    --shadow:0 4px 16px rgba(0,0,0,.35);
   }
-  /* ---------- בסיס: רקע כהה-רך עם גוון כחלחל ועומק ---------- */
+  /* ---------- בסיס: רקע עמוק ועשיר עם שתי הילות עדינות (עומק) ---------- */
   html, body, .stApp, p, span, label, li, input, textarea, button, select, td, th,
   h1,h2,h3,h4, .stMarkdown, div[data-testid="stExpander"] summary, div[data-baseweb="tab"]{
      font-family:'Inter','Segoe UI',-apple-system,Roboto,Arial,sans-serif; }
   .stApp { direction:rtl; background:
-     radial-gradient(920px 480px at 82% -6%, #1c2233 0%, rgba(28,34,51,0) 55%),
-     linear-gradient(180deg, #121521 0%, #0d0f15 44%) !important; background-attachment:fixed !important; }
+     radial-gradient(1000px 520px at 85% -8%, #1d2949 0%, rgba(29,41,73,0) 52%),
+     radial-gradient(760px 420px at 2% 3%, #161c33 0%, rgba(22,28,51,0) 46%),
+     linear-gradient(180deg, #0f1422 0%, #0a0d14 48%) !important; background-attachment:fixed !important; }
   [data-testid="stAppViewContainer"], [data-testid="stMain"], .main { background:transparent !important; }
   [data-testid="stHeader"] { background:rgba(13,15,21,.5) !important; backdrop-filter:blur(8px); }
   .block-container { padding-top:2.2rem !important; padding-bottom:3rem !important; }
@@ -91,11 +93,11 @@ CSS = """
      background:linear-gradient(180deg,#7681ee,#626dde) !important;
      box-shadow:0 2px 8px rgba(107,118,232,.3) !important; }
   /* ---------- קוביות KPI ---------- */
-  .kpi { background:linear-gradient(180deg,#1d2029,#161922);
+  .kpi { background:linear-gradient(180deg,var(--surface2),var(--surface));
      border:1px solid var(--border); border-radius:14px; padding:17px 18px; text-align:center;
-     box-shadow:0 1px 2px rgba(0,0,0,.2); transition:border-color .15s, transform .12s, box-shadow .15s; }
+     box-shadow:var(--shadow); transition:border-color .15s, transform .12s, box-shadow .15s; }
   .kpi:hover { border-color:var(--border-hi); transform:translateY(-2px);
-     box-shadow:0 8px 24px rgba(0,0,0,.33); }
+     box-shadow:0 10px 30px rgba(0,0,0,.45); }
   .kpi .v { font-size:31px; font-weight:650; line-height:1.05; letter-spacing:-1.2px; }
   .kpi .t { font-size:12px; color:var(--text2); margin-top:6px; font-weight:450; }
   .kpi.red .v{color:var(--red)} .kpi.orange .v{color:var(--amber)} .kpi.green .v{color:var(--green)}
@@ -108,10 +110,10 @@ CSS = """
   .chip b { color:var(--text); font-weight:600; }
   /* ---------- כרטיסים מתקפלים ---------- */
   div[data-testid="stExpander"] { border:1px solid var(--border) !important; border-radius:13px !important;
-     background:linear-gradient(180deg,#181b24,#141620) !important; margin-bottom:8px;
-     transition:border-color .15s, box-shadow .15s; }
+     background:linear-gradient(180deg,var(--surface),#121824) !important; margin-bottom:9px;
+     box-shadow:var(--shadow); transition:border-color .15s, box-shadow .15s; }
   div[data-testid="stExpander"]:hover { border-color:var(--border-hi) !important;
-     box-shadow:0 4px 14px rgba(0,0,0,.26); }
+     box-shadow:0 8px 22px rgba(0,0,0,.4); }
   div[data-testid="stExpander"] summary { font-size:13.5px !important; padding:12px 16px !important;
      font-weight:500; }
   div[data-testid="stExpander"] summary:hover { color:var(--accent-hi) !important; }
@@ -123,6 +125,23 @@ CSS = """
   div[data-testid="stFileUploader"] { border:1.5px dashed var(--border-hi); border-radius:12px;
      padding:10px; background:var(--surface); }
   hr { border-color:var(--border); margin:16px 0; }
+  /* ---------- כותרת-על (hero) ---------- */
+  .hero { position:relative; overflow:hidden; display:flex; align-items:center;
+     justify-content:space-between; gap:24px; flex-wrap:wrap;
+     background:linear-gradient(120deg,#1c2340 0%,#151b2c 55%,#121722 100%);
+     border:1px solid #313c5a; border-radius:18px; padding:22px 28px; margin:2px 0 20px;
+     box-shadow:0 12px 34px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.045); }
+  .hero:before { content:''; position:absolute; inset:0; pointer-events:none;
+     background:radial-gradient(460px 220px at 90% -40%, rgba(109,120,236,.42), transparent 68%); }
+  .hero-l { position:relative; }
+  .hero-title { font-size:26px; font-weight:700; letter-spacing:-0.8px; color:#fff; }
+  .hero-sub { font-size:13px; color:#aab3c6; margin-top:5px; }
+  .hero-stats { position:relative; display:flex; gap:14px; }
+  .hstat { min-width:96px; text-align:center; padding:10px 16px; border-radius:13px;
+     background:rgba(12,16,26,.5); border:1px solid rgba(255,255,255,.07); }
+  .hstat .hv { display:block; font-size:28px; font-weight:700; letter-spacing:-1px; line-height:1; }
+  .hstat .hl { display:block; font-size:11.5px; color:#aab3c6; margin-top:6px; }
+  .hstat.open .hv{color:#f2f4f8} .hstat.done .hv{color:var(--green)} .hstat.late .hv{color:var(--red)}
   [data-testid="stAppViewContainer"] > .main { background:transparent !important; }
 </style>
 """
@@ -251,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 21</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 22</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -319,9 +338,20 @@ with st.sidebar:
 
 f_all = core.with_derived(led["findings"], REM)
 
-# ---------------------------------------------------------------- כותרת (נקייה — בלי קוביות)
-
-st.markdown("# 🎛️ לוח בקרת קטלוג")
+# ---------------------------------------------------------------- כותרת-על (hero) עם סיכום חי
+_act_all = f_all[~f_all["סוג ממצא"].isin(core.SIDE_TYPES)] if not f_all.empty else f_all
+_h_open = int((~_act_all["סטטוס"].isin(core.CLOSED_STATUSES)).sum()) if not _act_all.empty else 0
+_h_done = int(_act_all["סטטוס"].isin(core.CLOSED_STATUSES).sum()) if not _act_all.empty else 0
+_h_late = int(_act_all["באיחור"].sum()) if (not _act_all.empty and "באיחור" in _act_all) else 0
+st.markdown(
+    "<div class='hero'>"
+    "<div class='hero-l'><div class='hero-title'>🎛️ לוח בקרת קטלוג</div>"
+    "<div class='hero-sub'>ניהול מעגל-הבקרה המלא — מריצה, דרך מייל-לאנליסט, ועד סגירה</div></div>"
+    "<div class='hero-stats'>"
+    f"<div class='hstat open'><span class='hv'>{_h_open}</span><span class='hl'>ממצאים פתוחים</span></div>"
+    f"<div class='hstat done'><span class='hv'>{_h_done}</span><span class='hl'>טופלו</span></div>"
+    f"<div class='hstat late'><span class='hv'>{_h_late}</span><span class='hl'>באיחור</span></div>"
+    "</div></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------- טאבים
 # 'לפי תקופה' ראשון — זו מסך העבודה היומיומי; 'סקירה' (תמונת-על כוללת) משנית.
@@ -356,24 +386,26 @@ with tab_period:
                     f"{act['אנליסט'].nunique()} אנליסטים</div>", unsafe_allow_html=True)
 
         # שלבי-התהליך העיקריים (זורמים מימין לשמאל), ואז קופסאות-קצה נפרדות
-        stages = [(n_wait, "ממתין", "#dba13a"), (n_prog, "בטיפול", "#4ea7fc"),
-                  (n_done, "טופל", "#4cb782")]
+        stages = [(n_wait, "ממתין", "#e8b04b"), (n_prog, "בטיפול", "#5aaefc"),
+                  (n_done, "טופל", "#4cc38a")]
 
-        def _box(v, t, c, txt="#8b93a3"):
-            dim = "opacity:.4;" if v == 0 else ""
-            return (f"<div style='background:#16171a;border:1px solid #26282d;border-top:4px solid {c};"
-                    f"border-radius:12px;padding:10px 20px;text-align:center;min-width:112px;{dim}'>"
-                    f"<div style='font-size:28px;font-weight:700;color:{c}'>{v}</div>"
-                    f"<div style='font-size:12px;color:{txt}'>{t}</div></div>")
+        def _box(v, t, c, txt="#98a1b2"):
+            dim = "opacity:.45;" if v == 0 else ""
+            return (f"<div style='background:linear-gradient(180deg,#1c2331,#151b28);"
+                    f"border:1px solid #2c3543;border-top:3px solid {c};"
+                    f"border-radius:14px;padding:12px 22px;text-align:center;min-width:118px;"
+                    f"box-shadow:0 4px 14px rgba(0,0,0,.3);{dim}'>"
+                    f"<div style='font-size:30px;font-weight:700;letter-spacing:-1px;color:{c}'>{v}</div>"
+                    f"<div style='font-size:12px;color:{txt};margin-top:3px'>{t}</div></div>")
 
-        arrow = "<div style='color:#3a3d44;font-size:22px;align-self:center'>◄</div>"
+        arrow = "<div style='color:#414d61;font-size:22px;align-self:center'>◄</div>"
         html = "<div style='display:flex;gap:10px;flex-wrap:wrap'>"
         html += arrow.join(_box(v, t, c) for v, t, c in stages)
         extras = ""
         if n_irr:
-            extras += "<div style='width:14px'></div>" + _box(n_irr, "לא רלוונטי (נדחה)", "#6b7280")
+            extras += "<div style='width:14px'></div>" + _box(n_irr, "לא רלוונטי (נדחה)", "#6b7484")
         if n_late:
-            extras += "<div style='width:6px'></div>" + _box(n_late, "🔴 באיחור", "#eb5757", "#f0a3a3")
+            extras += "<div style='width:6px'></div>" + _box(n_late, "🔴 באיחור", "#f16a6a", "#f0a3a3")
         html += extras + "</div>"
         st.markdown(html, unsafe_allow_html=True)
 
