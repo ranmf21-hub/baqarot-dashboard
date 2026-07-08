@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 23</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 24</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -422,24 +422,45 @@ with tab_period:
                     "מומלץ <b>📧 טיוטת Outlook</b> — נפתחת ישירות בחלון-כתיבה של Outlook (הורד את הקובץ ופתח אותו). "
                     "כשמאשרים לך — סמן 'טופל' בעמודת הסטטוס ושמור.</div>", unsafe_allow_html=True)
 
-        SHOW = ["סטטוס", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
+        SHOW = ["סטטוס", "תגובה", "סוג ממצא", "מספר בקשה", "שורה", "מקט", "תיאור",
                 "נמצא", "צפוי", "הערה", "מזהה"]
+
+        def _reply_cell(r):
+            """חיווי-תגובה לצד כל פריט: האם התקבלה תשובה / ממתין / דורש אימות."""
+            note = str(r.get("הערה") or "")
+            src = str(r.get("מקור חיווי") or "")
+            replied = ("תשובה:" in note) or (src in ("מייל", "מייל (אוטומטי)"))
+            if "דרוש אימות" in note:
+                return "⚠ לאימות"
+            if replied:
+                return "📩 נענה"
+            if r["סטטוס"] == "נשלח":
+                return "⏳ ממתין"
+            return "—"
+
         order = (act.assign(_open=~act["סטטוס"].isin(core.CLOSED_STATUSES))
                  .groupby("אנליסט")["_open"].sum().sort_values(ascending=False))
         for an in order.index:
-            sub = act[act["אנליסט"] == an]
+            sub = act[act["אנליסט"] == an].copy()
+            sub["תגובה"] = sub.apply(_reply_cell, axis=1)
             total, closed = len(sub), int(sub["סטטוס"].isin(core.CLOSED_STATUSES).sum())
             late_an = int(sub["באיחור"].sum())
-            if closed == total:
+            replied = int((sub["מקור חיווי"].astype(str).isin(["מייל", "מייל (אוטומטי)"])
+                           | sub["הערה"].astype(str).str.contains("תשובה:", na=False)).sum())
+            review_an = int(sub["הערה"].astype(str).str.contains("דרוש אימות", na=False).sum())
+            if review_an:
+                icon, state = "⚠", f"{review_an} לאימות"
+            elif closed == total:
                 icon, state = "✅", "הושלם"
             elif late_an:
                 icon, state = "🔴", f"{late_an} באיחור"
-            elif (sub["סטטוס"].isin(core.REPLIED_STATUSES)).any():
+            elif replied:
                 icon, state = "🔵", "בטיפול"
             else:
                 icon, state = "🟡", "ממתין"
-            label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total} · {state}"
-            with st.expander(label, expanded=bool(late_an)):
+            rp = f" · 📩 נענו {replied}/{total}" if replied else " · ⏳ ממתין לתגובה"
+            label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total}{rp} · {state}"
+            with st.expander(label, expanded=bool(late_an or review_an)):
                 ed = st.data_editor(
                     sub[SHOW].sort_values("סטטוס"),
                     hide_index=True, use_container_width=True,
@@ -447,34 +468,42 @@ with tab_period:
                     column_config={
                         "סטטוס": st.column_config.SelectboxColumn("סטטוס", options=core.STATUSES,
                                                                    width="small"),
+                        "תגובה": st.column_config.TextColumn("תגובה", width="small",
+                                                             help="📩 נענה · ⏳ ממתין · ⚠ דרוש אימות"),
                         "הערה": st.column_config.TextColumn("הערה", width="medium"),
                         "מזהה": None,
                     }, key=f"an_ed_{sel}_{an}")
                 open_sub = sub[~sub["סטטוס"].isin(core.CLOSED_STATUSES)]
                 to_addr = sub["נמען"].iloc[0] if len(sub) else ""
 
-                # --- מעקב Outlook: מזערי — כפתור אחד שנפתח למגירת-שליחה (חוסך מקום כשיש הרבה פריטים) ---
+                # --- שליחת מיילים: כפתור ראשי אחד לכל הפריטים + אופציה קטנה לפריט בודד ---
                 if len(open_sub):
-                    with st.popover(f"📧 שלח מייל-מעקב  ({len(open_sub)} פתוחים)", use_container_width=True):
-                        st.markdown("<div class='note'>בחר פריט, הורד את הטיוטה ופתח אותה — "
-                                    "Outlook ייפתח עם המייל מוכן לשליחה.</div>", unsafe_allow_html=True)
-                        # חיווי 'כבר הגיב' — כדי לא לשלוח מעקב על פריט שכבר התקבל עליו מענה
-                        labels = {}
-                        for _, r in open_sub.iterrows():
-                            mk = "🔵 כבר הגיב · " if r["סטטוס"] == "בטיפול" else ""
-                            labels[f"{mk}בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:30]}"] = r["מזהה"]
-                        pk = st.selectbox("פריט", list(labels), key=f"pk_{sel}_{an}",
-                                          label_visibility="collapsed")
-                        prow = open_sub[open_sub["מזהה"] == labels[pk]].iloc[0].to_dict()
-                        st.download_button("📧 טיוטה לפריט הנבחר", core.followup_eml(prow),
+                    n_open = len(open_sub)
+                    if n_open == 1:
+                        prow = open_sub.iloc[0].to_dict()
+                        st.download_button("📧 שלח מייל-מעקב לפריט", core.followup_eml(prow),
                                            file_name=f"followup_{prow['מספר בקשה']}_{prow['שורה']}.eml",
-                                           mime="message/rfc822", key=f"dl_{sel}_{an}",
-                                           use_container_width=True)
-                        if to_addr and len(open_sub) > 1:
-                            st.download_button(f"📧 טיוטה אחת לכל {len(open_sub)} הפתוחים",
-                                               core.followup_eml_bulk(open_sub, to_addr),
-                                               file_name=f"followup_{an}.eml", mime="message/rfc822",
-                                               key=f"dlb_{sel}_{an}", use_container_width=True)
+                                           mime="message/rfc822", key=f"dl1_{sel}_{an}",
+                                           use_container_width=True, type="primary")
+                    else:
+                        mc1, mc2 = st.columns([3, 1])
+                        mc1.download_button(f"📧 מייל-מעקב לכל {n_open} הפריטים של {an}",
+                                            core.followup_eml_bulk(open_sub, to_addr),
+                                            file_name=f"followup_{an}.eml", mime="message/rfc822",
+                                            key=f"dlall_{sel}_{an}", use_container_width=True,
+                                            type="primary")
+                        with mc2.popover("📧 פריט בודד", use_container_width=True):
+                            labels = {}
+                            for _, r in open_sub.iterrows():
+                                mk = "🔵 נענה · " if r["סטטוס"] == "בטיפול" else ""
+                                labels[f"{mk}בקשה {r['מספר בקשה']}/{r['שורה']} — {str(r['תיאור'])[:28]}"] = r["מזהה"]
+                            pk = st.selectbox("בחר פריט", list(labels), key=f"pk_{sel}_{an}",
+                                              label_visibility="collapsed")
+                            prow = open_sub[open_sub["מזהה"] == labels[pk]].iloc[0].to_dict()
+                            st.download_button("📧 הורד טיוטה לפריט", core.followup_eml(prow),
+                                               file_name=f"followup_{prow['מספר בקשה']}_{prow['שורה']}.eml",
+                                               mime="message/rfc822", key=f"dl1_{sel}_{an}",
+                                               use_container_width=True)
 
                 b2, b3 = st.columns(2)
                 if b2.button("✅ הכל טופל", use_container_width=True, key=f"done_{sel}_{an}",
