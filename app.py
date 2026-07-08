@@ -22,73 +22,100 @@ st.set_page_config(page_title="לוח בקרת קטלוג", page_icon="🎛️",
 
 CSS = """
 <style>
-  /* שפת עיצוב בהשראת Linear — כהה כמעט-שחור, אקסנט אינדיגו, גבולות עדינים, טיפוגרפיה מדויקת */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
   :root{
-    --bg:#0a0b0d; --surface:#16171a; --surface2:#1c1e22;
-    --border:#26282d; --border-hi:#33363d;
-    --text:#ededef; --text2:#8a8f98; --text3:#62666d;
-    --accent:#5e6ad2; --accent-hi:#8b93e8;
-    --green:#4cb782; --amber:#dba13a; --red:#eb5757; --blue:#4ea7fc; --gray:#6b7280;
+    --bg:#0a0b0d; --surface:#141518; --surface2:#1a1c20; --elev:#212329;
+    --border:#24262b; --border-hi:#34373f;
+    --text:#f2f3f5; --text2:#9297a1; --text3:#63666e;
+    --accent:#5e6ad2; --accent-hi:#7b86e8; --accent-dim:rgba(94,106,210,.16);
+    --green:#4cb782; --amber:#e0a53c; --red:#eb5757; --blue:#4ea7fc; --gray:#6b7280; --indigo:#8b83f0;
   }
-  .stApp { direction: rtl; background: var(--bg); }
-  section[data-testid="stSidebar"] { direction: rtl; border-left:1px solid var(--border);
-      background: #0d0e11; }
-  .stApp, .stMarkdown, p, span, label, input, button, div[data-testid="stExpander"] summary {
-      font-family:"Inter","Segoe UI",-apple-system,Roboto,Arial,sans-serif; }
-  h1,h2,h3 { letter-spacing:-0.2px; color:var(--text); font-weight:600; }
-  h1 { font-size:25px; }
-  h3 { font-size:17px; }
-  /* קוביות KPI — משטח עדין, פס-אקסנט דק, טיפוגרפיה מוקפדת */
-  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px;
-         padding:15px 18px; text-align:center; transition:border-color .15s; }
-  .kpi:hover { border-color:var(--border-hi); }
-  .kpi .v { font-size:29px; font-weight:600; line-height:1.15; letter-spacing:-0.5px; }
-  .kpi .t { font-size:12px; color:var(--text2); margin-top:5px; }
-  .kpi.red    { border-top:2px solid var(--red); }    .kpi.red .v    { color:var(--red); }
-  .kpi.orange { border-top:2px solid var(--amber); }  .kpi.orange .v { color:var(--amber); }
-  .kpi.green  { border-top:2px solid var(--green); }  .kpi.green .v  { color:var(--green); }
-  .kpi.blue   { border-top:2px solid var(--blue); }   .kpi.blue .v   { color:var(--blue); }
-  .kpi.gray   { border-top:2px solid var(--gray); }   .kpi.gray .v   { color:var(--text2); }
-  .chip { display:inline-block; background:var(--surface); border:1px solid var(--border);
-          border-radius:7px; padding:4px 12px; margin:0 4px 5px 0; font-size:12.5px; color:var(--text2); }
+  /* ---------- בסיס + עומק ---------- */
+  html, body, .stApp, p, span, label, li, input, textarea, button, select, td, th,
+  h1,h2,h3,h4, .stMarkdown, div[data-testid="stExpander"] summary, div[data-baseweb="tab"]{
+     font-family:'Inter','Segoe UI',-apple-system,Roboto,Arial,sans-serif; }
+  .stApp { direction:rtl; background:
+     radial-gradient(1100px 520px at 72% -8%, #15171e 0%, rgba(21,23,30,0) 58%), #0a0b0d !important; }
+  [data-testid="stAppViewContainer"], [data-testid="stMain"], .main { background:transparent !important; }
+  [data-testid="stHeader"] { background:rgba(10,11,13,.55) !important; backdrop-filter:blur(8px); }
+  .block-container { padding-top:2.2rem !important; padding-bottom:3rem !important; }
+  ::selection { background:var(--accent-dim); }
+  ::-webkit-scrollbar { width:11px; height:11px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#2b2e35; border-radius:6px; border:2px solid #0a0b0d; }
+  ::-webkit-scrollbar-thumb:hover { background:#3a3d45; }
+  /* ---------- טיפוגרפיה ---------- */
+  .stApp, p, span, label { color:var(--text); }
+  h1 { font-size:23px !important; font-weight:600 !important; letter-spacing:-0.6px; color:var(--text); }
+  h2 { font-size:19px !important; font-weight:600 !important; letter-spacing:-0.3px; }
+  h3 { font-size:16px !important; font-weight:600 !important; letter-spacing:-0.2px; color:var(--text); }
+  .note { color:var(--text2); font-size:12.5px; line-height:1.6; }
+  a { color:var(--accent-hi); text-decoration:none; } a:hover { text-decoration:underline; }
+  /* ---------- סרגל צד ---------- */
+  section[data-testid="stSidebar"] { direction:rtl; background:#0c0d10 !important;
+     border-left:1px solid var(--border); }
+  /* ---------- כפתורים ---------- */
+  .stButton>button, .stDownloadButton>button, div[data-testid="stPopover"]>button {
+     background:var(--surface2) !important; border:1px solid var(--border) !important;
+     color:var(--text) !important; border-radius:9px !important; font-weight:500 !important;
+     font-size:13.5px !important; padding:.44rem .95rem !important; box-shadow:none !important;
+     transition:background .15s, border-color .15s, transform .05s !important; }
+  .stButton>button:hover, .stDownloadButton>button:hover, div[data-testid="stPopover"]>button:hover {
+     background:var(--elev) !important; border-color:var(--border-hi) !important; }
+  .stButton>button:active { transform:translateY(1px); }
+  button[kind="primary"], button[data-testid="baseButton-primary"] {
+     background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; }
+  button[kind="primary"]:hover, button[data-testid="baseButton-primary"]:hover {
+     background:var(--accent-hi) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; }
+  /* ---------- שדות קלט / בחירה ---------- */
+  .stTextInput input, .stNumberInput input, .stDateInput input,
+  div[data-baseweb="select"]>div, div[data-baseweb="input"]>div, div[data-baseweb="base-input"] {
+     background:var(--surface) !important; border-color:var(--border) !important;
+     border-radius:8px !important; color:var(--text) !important; }
+  .stTextInput input:focus, .stNumberInput input:focus,
+  div[data-baseweb="select"]>div:focus-within {
+     border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; }
+  /* ---------- טאבים — ניווט מקוטע ---------- */
+  .stTabs [data-baseweb="tab-list"] { gap:3px; background:var(--surface); border:1px solid var(--border);
+     border-radius:11px; padding:4px; }
+  .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none !important; }
+  .stTabs [data-baseweb="tab"] { font-size:13.5px !important; color:var(--text2) !important;
+     border-radius:8px; padding:6px 14px !important; transition:.15s; }
+  .stTabs [data-baseweb="tab"]:hover { color:var(--text) !important; background:var(--surface2); }
+  .stTabs [aria-selected="true"] { color:#fff !important; background:var(--accent) !important; }
+  /* ---------- קוביות KPI ---------- */
+  .kpi { background:linear-gradient(180deg,var(--surface2),var(--surface));
+     border:1px solid var(--border); border-radius:13px; padding:16px 18px; text-align:center;
+     transition:border-color .15s, transform .12s, box-shadow .15s; }
+  .kpi:hover { border-color:var(--border-hi); transform:translateY(-2px);
+     box-shadow:0 6px 20px rgba(0,0,0,.28); }
+  .kpi .v { font-size:31px; font-weight:650; line-height:1.05; letter-spacing:-1.2px; }
+  .kpi .t { font-size:12px; color:var(--text2); margin-top:6px; font-weight:450; }
+  .kpi.red .v{color:var(--red)} .kpi.orange .v{color:var(--amber)} .kpi.green .v{color:var(--green)}
+  .kpi.blue .v{color:var(--blue)} .kpi.gray .v{color:var(--text2)}
+  .kpi.red{border-top:2px solid var(--red)} .kpi.orange{border-top:2px solid var(--amber)}
+  .kpi.green{border-top:2px solid var(--green)} .kpi.blue{border-top:2px solid var(--blue)}
+  .kpi.gray{border-top:2px solid var(--gray)}
+  .chip { display:inline-block; background:var(--surface2); border:1px solid var(--border);
+     border-radius:8px; padding:5px 13px; margin:0 4px 6px 0; font-size:12.5px; color:var(--text2); }
   .chip b { color:var(--text); font-weight:600; }
-  .note { color:var(--text2); font-size:12.5px; line-height:1.55; }
-  /* טאבים — מינימלי, קו-אקסנט על הפעיל */
-  .stTabs [data-baseweb="tab-list"] { gap:2px; border-bottom:1px solid var(--border); }
-  .stTabs [data-baseweb="tab"] { font-size:14px; color:var(--text2); padding:7px 14px; }
-  .stTabs [aria-selected="true"] { color:var(--text) !important; }
-  /* כרטיסים מתקפלים (אנליסטים) */
-  div[data-testid="stExpander"] { border:1px solid var(--border); border-radius:10px;
-      background:var(--surface); }
-  div[data-testid="stExpander"] summary { font-size:14px; }
-  div[data-testid="stExpander"] summary:hover { color:var(--accent-hi); }
-  /* טבלאות */
+  /* ---------- כרטיסים מתקפלים ---------- */
+  div[data-testid="stExpander"] { border:1px solid var(--border) !important; border-radius:12px !important;
+     background:var(--surface) !important; margin-bottom:8px; transition:border-color .15s; }
+  div[data-testid="stExpander"]:hover { border-color:var(--border-hi) !important; }
+  div[data-testid="stExpander"] summary { font-size:13.5px !important; padding:12px 16px !important;
+     font-weight:500; }
+  div[data-testid="stExpander"] summary:hover { color:var(--accent-hi) !important; }
+  /* ---------- טבלאות / מדדים / העלאה ---------- */
   div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] { direction:ltr;
-      border:1px solid var(--border); border-radius:10px; }
+     border:1px solid var(--border) !important; border-radius:12px; overflow:hidden; }
   div[data-testid="stMetric"] { background:var(--surface); border:1px solid var(--border);
-      border-radius:10px; padding:14px 16px; }
-  div[data-testid="stFileUploader"] { border:1.5px dashed var(--border-hi); border-radius:10px;
-      padding:8px; background:var(--surface); }
-  /* כפתורים — עדינים */
-  .stButton button, .stDownloadButton button, div[data-testid="stPopover"] button {
-      border-radius:8px; border:1px solid var(--border); font-weight:500;
-      transition:border-color .15s, background .15s; }
-  .stButton button:hover, .stDownloadButton button:hover { border-color:var(--border-hi); }
-  hr { border-color:var(--border); margin:14px 0; }
-  a { color:var(--accent-hi); }
-  /* אכיפת התֵמה דרך CSS — לא תלוי ב-config.toml של Streamlit Cloud */
-  .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
-      background:#0a0b0d !important; }
-  [data-testid="stHeader"] { background:rgba(10,11,13,0.55) !important; }
-  section[data-testid="stSidebar"] { background:#0d0e11 !important; }
-  /* כפתור ראשי — אינדיגו Linear (אכיפה) */
-  button[kind="primary"], [data-testid="baseButton-primary"],
-  .stButton button[kind="primary"], .stDownloadButton button[kind="primary"] {
-      background:#5e6ad2 !important; border:1px solid #5e6ad2 !important; color:#ffffff !important; }
-  button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {
-      background:#6b76dd !important; }
-  /* קו-אקסנט אינדיגו על הטאב הפעיל */
-  .stTabs [aria-selected="true"] { border-bottom:2px solid #5e6ad2 !important; }
+     border-radius:12px; padding:15px 17px; }
+  div[data-testid="stFileUploader"] { border:1.5px dashed var(--border-hi); border-radius:12px;
+     padding:10px; background:var(--surface); }
+  hr { border-color:var(--border); margin:16px 0; }
+  /* ---------- אכיפת רקע (לא תלוי ב-config.toml) ---------- */
+  [data-testid="stAppViewContainer"] > .main { background:transparent !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -216,7 +243,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 19</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 20</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
