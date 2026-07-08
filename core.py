@@ -62,8 +62,8 @@ def _followup_subject_body(row):
 
 
 def _bulk_subject_body(sub):
-    lines = [f"• בקשה {r['מספר בקשה']} שורה {r['שורה']} (מק\"ט {r['מקט']}) — "
-             f"{r['סוג ממצא']}: {r['תיאור']}" for _, r in sub.iterrows()]
+    lines = [f"• בקשה {r['מספר בקשה']} שורה {r['שורה']} {followup_tag(r['מספר בקשה'], r['שורה'])} "
+             f"(מק\"ט {r['מקט']}) — {r['סוג ממצא']}: {r['תיאור']}" for _, r in sub.iterrows()]
     # התקופה בכותרת — כדי שהסורקים (תשובות/שליחות) יזהו את מייל-הבולק לפי תקופה+אנליסט
     try:
         per = str(sub["תקופת בקרה"].iloc[0] or "").strip()
@@ -165,15 +165,19 @@ def _bulk_html(sub):
     tdr = f'style="padding:8px 11px;border:1px solid #e3e7ec;{_FONT}font-size:13px;color:#222222;text-align:right;"'
     tde = (f'style="padding:8px 11px;border:1px solid #e3e7ec;{_FONT}font-size:13px;'
            'color:#C00000;font-weight:bold;text-align:center;"')
+    tdid = (f'style="padding:8px 11px;border:1px solid #e3e7ec;{_FONT}font-size:12px;'
+            'color:#8a8f98;text-align:center;"')
     body = ""
     for _, r in sub.iterrows():
         g = (lambda k: _esc(r.get(k, "")))
+        tag = followup_tag(r.get("מספר בקשה", ""), r.get("שורה", ""))
         body += (f'<tr><td {td}>{g("מספר בקשה")}</td><td {td}>{g("שורה")}</td>'
-                 f'<td {td}>{g("מקט")}</td><td {tdr}>{g("תיאור")}</td><td {tde}>{g("סוג ממצא")}</td></tr>')
+                 f'<td {td}>{g("מקט")}</td><td {tdr}>{g("תיאור")}</td><td {tde}>{g("סוג ממצא")}</td>'
+                 f'<td {tdid}>{tag}</td></tr>')
     inner = ('<table width="100%" cellpadding="0" cellspacing="0" border="0" '
              f'style="width:100%;border-collapse:collapse;{_RTL}">'
              f'<tr><th {th}>מס\' בקשה</th><th {th}>שורה</th><th {th}>מק"ט</th>'
-             f'<th {th}>תיאור הפריט</th><th {th}>הבעיה</th></tr>{body}</table>')
+             f'<th {th}>תיאור הפריט</th><th {th}>הבעיה</th><th {th}>מזהה</th></tr>{body}</table>')
     return _email_shell("בבקרת הקטלוג נמצאו הליקויים הבאים בפריטים שקטלגת. "
                         "נבקש לאשר את סטטוס הטיפול בכל אחד:", inner, bulk=True)
 
