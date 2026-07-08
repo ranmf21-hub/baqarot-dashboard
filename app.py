@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 24</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 25</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -458,7 +458,12 @@ with tab_period:
                 icon, state = "🔵", "בטיפול"
             else:
                 icon, state = "🟡", "ממתין"
-            rp = f" · 📩 נענו {replied}/{total}" if replied else " · ⏳ ממתין לתגובה"
+            if replied:
+                rp = f" · 📩 נענו {replied}/{total}"
+            elif (sub["סטטוס"] == "נשלח").any():
+                rp = " · ⏳ ממתין לתגובה"
+            else:
+                rp = ""
             label = f"{icon} {an or '(ללא שם)'} · {total} ממצאים · נסגרו {closed}/{total}{rp} · {state}"
             with st.expander(label, expanded=bool(late_an or review_an)):
                 ed = st.data_editor(
