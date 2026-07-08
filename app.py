@@ -22,33 +22,64 @@ st.set_page_config(page_title="לוח בקרת קטלוג", page_icon="🎛️",
 
 CSS = """
 <style>
-  .stApp { direction: rtl; }
-  section[data-testid="stSidebar"] { direction: rtl; }
-  .stApp, .stMarkdown, p, span, label, input { font-family: "Segoe UI", Arial, sans-serif; }
-  h1, h2, h3 { letter-spacing: 0.3px; }
-  div[data-testid="stMetric"] { background: #151a22; border: 1px solid #232a35;
-      border-radius: 12px; padding: 14px 16px; }
-  .kpi { background:#151a22; border:1px solid #232a35; border-radius:14px;
-         padding:16px 18px; text-align:center; }
-  .kpi .v { font-size:34px; font-weight:700; line-height:1.1; }
-  .kpi .t { font-size:13px; color:#8b93a3; margin-top:4px; }
-  .kpi.red    { border-right: 5px solid #ef4444; }  .kpi.red .v    { color:#ef4444; }
-  .kpi.orange { border-right: 5px solid #f59e0b; }  .kpi.orange .v { color:#f59e0b; }
-  .kpi.green  { border-right: 5px solid #22c55e; }  .kpi.green .v  { color:#22c55e; }
-  .kpi.blue   { border-right: 5px solid #38bdf8; }  .kpi.blue .v   { color:#38bdf8; }
-  .kpi.gray   { border-right: 5px solid #6b7280; }  .kpi.gray .v   { color:#6b7280; }
-  .chip { display:inline-block; background:#151a22; border:1px solid #232a35; border-radius:20px;
-          padding:5px 14px; margin:0 4px 4px 0; font-size:13px; color:#c7cdd9; }
-  .chip b { color:#e5e9f0; }
-  div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] { direction: ltr; }
-  div[data-testid="stFileUploader"] { border: 2px dashed #2c3646; border-radius: 14px;
-      padding: 8px; background: #10151d; }
-  .stTabs [data-baseweb="tab"] { font-size: 15px; }
-  .note { color:#8b93a3; font-size:13px; }
+  /* שפת עיצוב בהשראת Linear — כהה כמעט-שחור, אקסנט אינדיגו, גבולות עדינים, טיפוגרפיה מדויקת */
+  :root{
+    --bg:#0a0b0d; --surface:#16171a; --surface2:#1c1e22;
+    --border:#26282d; --border-hi:#33363d;
+    --text:#ededef; --text2:#8a8f98; --text3:#62666d;
+    --accent:#5e6ad2; --accent-hi:#8b93e8;
+    --green:#4cb782; --amber:#dba13a; --red:#eb5757; --blue:#4ea7fc; --gray:#6b7280;
+  }
+  .stApp { direction: rtl; background: var(--bg); }
+  section[data-testid="stSidebar"] { direction: rtl; border-left:1px solid var(--border);
+      background: #0d0e11; }
+  .stApp, .stMarkdown, p, span, label, input, button, div[data-testid="stExpander"] summary {
+      font-family:"Inter","Segoe UI",-apple-system,Roboto,Arial,sans-serif; }
+  h1,h2,h3 { letter-spacing:-0.2px; color:var(--text); font-weight:600; }
+  h1 { font-size:25px; }
+  h3 { font-size:17px; }
+  /* קוביות KPI — משטח עדין, פס-אקסנט דק, טיפוגרפיה מוקפדת */
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+         padding:15px 18px; text-align:center; transition:border-color .15s; }
+  .kpi:hover { border-color:var(--border-hi); }
+  .kpi .v { font-size:29px; font-weight:600; line-height:1.15; letter-spacing:-0.5px; }
+  .kpi .t { font-size:12px; color:var(--text2); margin-top:5px; }
+  .kpi.red    { border-top:2px solid var(--red); }    .kpi.red .v    { color:var(--red); }
+  .kpi.orange { border-top:2px solid var(--amber); }  .kpi.orange .v { color:var(--amber); }
+  .kpi.green  { border-top:2px solid var(--green); }  .kpi.green .v  { color:var(--green); }
+  .kpi.blue   { border-top:2px solid var(--blue); }   .kpi.blue .v   { color:var(--blue); }
+  .kpi.gray   { border-top:2px solid var(--gray); }   .kpi.gray .v   { color:var(--text2); }
+  .chip { display:inline-block; background:var(--surface); border:1px solid var(--border);
+          border-radius:7px; padding:4px 12px; margin:0 4px 5px 0; font-size:12.5px; color:var(--text2); }
+  .chip b { color:var(--text); font-weight:600; }
+  .note { color:var(--text2); font-size:12.5px; line-height:1.55; }
+  /* טאבים — מינימלי, קו-אקסנט על הפעיל */
+  .stTabs [data-baseweb="tab-list"] { gap:2px; border-bottom:1px solid var(--border); }
+  .stTabs [data-baseweb="tab"] { font-size:14px; color:var(--text2); padding:7px 14px; }
+  .stTabs [aria-selected="true"] { color:var(--text) !important; }
+  /* כרטיסים מתקפלים (אנליסטים) */
+  div[data-testid="stExpander"] { border:1px solid var(--border); border-radius:10px;
+      background:var(--surface); }
+  div[data-testid="stExpander"] summary { font-size:14px; }
+  div[data-testid="stExpander"] summary:hover { color:var(--accent-hi); }
+  /* טבלאות */
+  div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] { direction:ltr;
+      border:1px solid var(--border); border-radius:10px; }
+  div[data-testid="stMetric"] { background:var(--surface); border:1px solid var(--border);
+      border-radius:10px; padding:14px 16px; }
+  div[data-testid="stFileUploader"] { border:1.5px dashed var(--border-hi); border-radius:10px;
+      padding:8px; background:var(--surface); }
+  /* כפתורים — עדינים */
+  .stButton button, .stDownloadButton button, div[data-testid="stPopover"] button {
+      border-radius:8px; border:1px solid var(--border); font-weight:500;
+      transition:border-color .15s, background .15s; }
+  .stButton button:hover, .stDownloadButton button:hover { border-color:var(--border-hi); }
+  hr { border-color:var(--border); margin:14px 0; }
+  a { color:var(--accent-hi); }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
-PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0b0e13", plot_bgcolor="#0b0e13")
+PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0a0b0d", plot_bgcolor="#0a0b0d")
 STATUS_BADGE = {"נשלח": "🟡 נשלח", "בטיפול": "🔵 בטיפול",
                 "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
 
@@ -274,24 +305,24 @@ with tab_period:
                     f"{act['אנליסט'].nunique()} אנליסטים</div>", unsafe_allow_html=True)
 
         # שלבי-התהליך העיקריים (זורמים מימין לשמאל), ואז קופסאות-קצה נפרדות
-        stages = [(n_wait, "ממתין", "#f59e0b"), (n_prog, "בטיפול", "#38bdf8"),
-                  (n_done, "טופל", "#22c55e")]
+        stages = [(n_wait, "ממתין", "#dba13a"), (n_prog, "בטיפול", "#4ea7fc"),
+                  (n_done, "טופל", "#4cb782")]
 
         def _box(v, t, c, txt="#8b93a3"):
             dim = "opacity:.4;" if v == 0 else ""
-            return (f"<div style='background:#151a22;border:1px solid #232a35;border-top:4px solid {c};"
+            return (f"<div style='background:#16171a;border:1px solid #26282d;border-top:4px solid {c};"
                     f"border-radius:12px;padding:10px 20px;text-align:center;min-width:112px;{dim}'>"
                     f"<div style='font-size:28px;font-weight:700;color:{c}'>{v}</div>"
                     f"<div style='font-size:12px;color:{txt}'>{t}</div></div>")
 
-        arrow = "<div style='color:#4a5568;font-size:22px;align-self:center'>◄</div>"
+        arrow = "<div style='color:#3a3d44;font-size:22px;align-self:center'>◄</div>"
         html = "<div style='display:flex;gap:10px;flex-wrap:wrap'>"
         html += arrow.join(_box(v, t, c) for v, t, c in stages)
         extras = ""
         if n_irr:
             extras += "<div style='width:14px'></div>" + _box(n_irr, "לא רלוונטי (נדחה)", "#6b7280")
         if n_late:
-            extras += "<div style='width:6px'></div>" + _box(n_late, "🔴 באיחור", "#ef4444", "#f0a3a3")
+            extras += "<div style='width:6px'></div>" + _box(n_late, "🔴 באיחור", "#eb5757", "#f0a3a3")
         html += extras + "</div>"
         st.markdown(html, unsafe_allow_html=True)
 
@@ -442,23 +473,23 @@ with tab_over:
             for _, r in ap.iterrows():
                 pct = int(r["אחוז סגירה"])
                 if r["באיחור"]:
-                    bar_color = "#ef4444"
+                    bar_color = "#eb5757"
                 elif pct >= 80:
-                    bar_color = "#22c55e"
+                    bar_color = "#4cb782"
                 elif pct >= 40:
-                    bar_color = "#f59e0b"
+                    bar_color = "#dba13a"
                 else:
-                    bar_color = "#38bdf8"
-                late_badge = (f"<span style='color:#ef4444;font-weight:700'> 🔴 {r['באיחור']} באיחור</span>"
+                    bar_color = "#4ea7fc"
+                late_badge = (f"<span style='color:#eb5757;font-weight:700'> 🔴 {r['באיחור']} באיחור</span>"
                               if r["באיחור"] else "")
                 st.markdown(
-                    f"<div style='background:#151a22;border:1px solid #232a35;border-radius:10px;"
+                    f"<div style='background:#16171a;border:1px solid #26282d;border-radius:10px;"
                     f"padding:10px 14px;margin:6px 0'>"
                     f"<div style='display:flex;justify-content:space-between;font-size:14px'>"
                     f"<span><b>{r['אנליסט']}</b>{late_badge}</span>"
                     f"<span class='note'>נשלחו {r['נשלחו']} · נצפו/בטיפול {r['נצפו/בטיפול']} · "
                     f"טופלו {r['טופלו']} מתוך {r['סהכ']}</span></div>"
-                    f"<div style='background:#232a35;border-radius:6px;height:10px;margin-top:8px'>"
+                    f"<div style='background:#26282d;border-radius:6px;height:10px;margin-top:8px'>"
                     f"<div style='background:{bar_color};width:{pct}%;height:10px;border-radius:6px'></div></div>"
                     f"</div>", unsafe_allow_html=True)
 
