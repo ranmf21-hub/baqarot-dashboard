@@ -270,7 +270,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 29</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 30</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -844,6 +844,33 @@ with tab_ship:
                         f"📩 <b>{reply_c}</b> סבבי-תשובות · {len(sh_df)} רשומות סה\"כ</div>",
                         unsafe_allow_html=True)
         st.dataframe(sh_df.iloc[::-1], use_container_width=True, hide_index=True)
+
+        # --- מחיקת רשומות מהיומן (לניקוי בדיקות) — סימון ✓ ואז מחיקה, נשמר לענן ---
+        with st.expander("🗑️ מחיקת רשומות מהיומן", expanded=False):
+            st.caption("סמן ✓ בעמודת 'מחק' לשורות להסרה, ואז לחץ 'מחק נבחרים'. שימושי לניקוי בדיקות. "
+                       "השורות נמחקות גם מהענן (הסורקים לא יחזירו אותן — הן כבר מסומנות 'נקלט').")
+            _dd = sh_df.copy()
+            _dd.insert(0, "מחק", False)
+            _ed = st.data_editor(
+                _dd.iloc[::-1], use_container_width=True, hide_index=True,
+                disabled=[c for c in _dd.columns if c != "מחק"],
+                column_config={"מחק": st.column_config.CheckboxColumn("מחק", width="small")},
+                key="ship_del")
+            _sel = [i for i in _ed.index if bool(_ed.at[i, "מחק"])]
+            _c1, _c2 = st.columns([1, 3])
+            if _c1.button(f"🗑️ מחק {len(_sel)} נבחרים", type="primary", key="ship_del_btn",
+                          disabled=(len(_sel) == 0)):
+                led["shipments"] = led["shipments"].drop(index=_sel).reset_index(drop=True)
+                _saved = persist()
+                st.session_state.flash = (f"נמחקו {len(_sel)} רשומות מהיומן"
+                                          + ("" if _saved else " — בזיכרון בלבד!"))
+                st.rerun()
+            if _c2.button("🧹 מחק את כל היומן", key="ship_del_all",
+                          help="מוחק את כל הרשומות ביומן המשלוחים (לא נוגע בממצאים)"):
+                led["shipments"] = led["shipments"].iloc[0:0]
+                _saved = persist()
+                st.session_state.flash = "היומן נוקה" + ("" if _saved else " — בזיכרון בלבד!")
+                st.rerun()
 
 # ---------- תפוקה ----------
 with tab_prod:
