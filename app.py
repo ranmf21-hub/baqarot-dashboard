@@ -24,26 +24,27 @@ CSS = """
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
   :root{
-    --bg:#0a0b0d; --surface:#141518; --surface2:#1a1c20; --elev:#212329;
-    --border:#24262b; --border-hi:#34373f;
-    --text:#f2f3f5; --text2:#9297a1; --text3:#63666e;
-    --accent:#5e6ad2; --accent-hi:#7b86e8; --accent-dim:rgba(94,106,210,.16);
-    --green:#4cb782; --amber:#e0a53c; --red:#eb5757; --blue:#4ea7fc; --gray:#6b7280; --indigo:#8b83f0;
+    --bg:#0d0f15; --surface:#171a22; --surface2:#1e212b; --elev:#262a36;
+    --border:#2a2f3b; --border-hi:#3d4454;
+    --text:#eef0f4; --text2:#99a1af; --text3:#6b7280;
+    --accent:#6b76e8; --accent-hi:#828cf0; --accent-dim:rgba(107,118,232,.18);
+    --green:#4cb782; --amber:#e5a94a; --red:#f06868; --blue:#56aefc; --gray:#6b7280; --indigo:#8b83f0;
   }
-  /* ---------- בסיס + עומק ---------- */
+  /* ---------- בסיס: רקע כהה-רך עם גוון כחלחל ועומק ---------- */
   html, body, .stApp, p, span, label, li, input, textarea, button, select, td, th,
   h1,h2,h3,h4, .stMarkdown, div[data-testid="stExpander"] summary, div[data-baseweb="tab"]{
      font-family:'Inter','Segoe UI',-apple-system,Roboto,Arial,sans-serif; }
   .stApp { direction:rtl; background:
-     radial-gradient(1100px 520px at 72% -8%, #15171e 0%, rgba(21,23,30,0) 58%), #0a0b0d !important; }
+     radial-gradient(920px 480px at 82% -6%, #1c2233 0%, rgba(28,34,51,0) 55%),
+     linear-gradient(180deg, #121521 0%, #0d0f15 44%) !important; background-attachment:fixed !important; }
   [data-testid="stAppViewContainer"], [data-testid="stMain"], .main { background:transparent !important; }
-  [data-testid="stHeader"] { background:rgba(10,11,13,.55) !important; backdrop-filter:blur(8px); }
+  [data-testid="stHeader"] { background:rgba(13,15,21,.5) !important; backdrop-filter:blur(8px); }
   .block-container { padding-top:2.2rem !important; padding-bottom:3rem !important; }
   ::selection { background:var(--accent-dim); }
   ::-webkit-scrollbar { width:11px; height:11px; }
   ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:#2b2e35; border-radius:6px; border:2px solid #0a0b0d; }
-  ::-webkit-scrollbar-thumb:hover { background:#3a3d45; }
+  ::-webkit-scrollbar-thumb { background:#2f3542; border-radius:6px; border:2px solid #0d0f15; }
+  ::-webkit-scrollbar-thumb:hover { background:#404859; }
   /* ---------- טיפוגרפיה ---------- */
   .stApp, p, span, label { color:var(--text); }
   h1 { font-size:23px !important; font-weight:600 !important; letter-spacing:-0.6px; color:var(--text); }
@@ -52,43 +53,49 @@ CSS = """
   .note { color:var(--text2); font-size:12.5px; line-height:1.6; }
   a { color:var(--accent-hi); text-decoration:none; } a:hover { text-decoration:underline; }
   /* ---------- סרגל צד ---------- */
-  section[data-testid="stSidebar"] { direction:rtl; background:#0c0d10 !important;
-     border-left:1px solid var(--border); }
-  /* ---------- כפתורים ---------- */
+  section[data-testid="stSidebar"] { direction:rtl; border-left:1px solid var(--border);
+     background:linear-gradient(180deg,#101320,#0c0e14) !important; }
+  /* ---------- כפתורים — מסגרת ברורה + עומק לכל כפתור ---------- */
   .stButton>button, .stDownloadButton>button, div[data-testid="stPopover"]>button {
-     background:var(--surface2) !important; border:1px solid var(--border) !important;
-     color:var(--text) !important; border-radius:9px !important; font-weight:500 !important;
-     font-size:13.5px !important; padding:.44rem .95rem !important; box-shadow:none !important;
-     transition:background .15s, border-color .15s, transform .05s !important; }
+     background:linear-gradient(180deg,#242835,#1b1f29) !important;
+     border:1px solid #343b49 !important; color:var(--text) !important; border-radius:10px !important;
+     font-weight:500 !important; font-size:13.5px !important; padding:.46rem 1rem !important;
+     box-shadow:inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.3) !important;
+     transition:background .15s, border-color .15s, box-shadow .15s, transform .06s !important; }
   .stButton>button:hover, .stDownloadButton>button:hover, div[data-testid="stPopover"]>button:hover {
-     background:var(--elev) !important; border-color:var(--border-hi) !important; }
+     background:linear-gradient(180deg,#2c3140,#242934) !important; border-color:#49515f !important;
+     box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 12px rgba(0,0,0,.35) !important; }
   .stButton>button:active { transform:translateY(1px); }
   button[kind="primary"], button[data-testid="baseButton-primary"] {
-     background:var(--accent) !important; border-color:var(--accent) !important; color:#fff !important; }
+     background:linear-gradient(180deg,#7681ee,#626dde) !important; border:1px solid #6b76e8 !important;
+     color:#fff !important; box-shadow:0 2px 10px rgba(107,118,232,.35) !important; }
   button[kind="primary"]:hover, button[data-testid="baseButton-primary"]:hover {
-     background:var(--accent-hi) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; }
+     background:linear-gradient(180deg,#838df2,#6f79e8) !important;
+     box-shadow:0 4px 16px rgba(107,118,232,.5) !important; }
   /* ---------- שדות קלט / בחירה ---------- */
   .stTextInput input, .stNumberInput input, .stDateInput input,
   div[data-baseweb="select"]>div, div[data-baseweb="input"]>div, div[data-baseweb="base-input"] {
-     background:var(--surface) !important; border-color:var(--border) !important;
-     border-radius:8px !important; color:var(--text) !important; }
+     background:#141722 !important; border-color:var(--border) !important;
+     border-radius:9px !important; color:var(--text) !important; }
   .stTextInput input:focus, .stNumberInput input:focus,
   div[data-baseweb="select"]>div:focus-within {
      border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; }
   /* ---------- טאבים — ניווט מקוטע ---------- */
-  .stTabs [data-baseweb="tab-list"] { gap:3px; background:var(--surface); border:1px solid var(--border);
-     border-radius:11px; padding:4px; }
+  .stTabs [data-baseweb="tab-list"] { gap:3px; background:#12141d; border:1px solid var(--border);
+     border-radius:12px; padding:4px; }
   .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none !important; }
   .stTabs [data-baseweb="tab"] { font-size:13.5px !important; color:var(--text2) !important;
-     border-radius:8px; padding:6px 14px !important; transition:.15s; }
-  .stTabs [data-baseweb="tab"]:hover { color:var(--text) !important; background:var(--surface2); }
-  .stTabs [aria-selected="true"] { color:#fff !important; background:var(--accent) !important; }
+     border-radius:9px; padding:6px 14px !important; transition:.15s; }
+  .stTabs [data-baseweb="tab"]:hover { color:var(--text) !important; background:#1c2029; }
+  .stTabs [aria-selected="true"] { color:#fff !important;
+     background:linear-gradient(180deg,#7681ee,#626dde) !important;
+     box-shadow:0 2px 8px rgba(107,118,232,.3) !important; }
   /* ---------- קוביות KPI ---------- */
-  .kpi { background:linear-gradient(180deg,var(--surface2),var(--surface));
-     border:1px solid var(--border); border-radius:13px; padding:16px 18px; text-align:center;
-     transition:border-color .15s, transform .12s, box-shadow .15s; }
+  .kpi { background:linear-gradient(180deg,#1d2029,#161922);
+     border:1px solid var(--border); border-radius:14px; padding:17px 18px; text-align:center;
+     box-shadow:0 1px 2px rgba(0,0,0,.2); transition:border-color .15s, transform .12s, box-shadow .15s; }
   .kpi:hover { border-color:var(--border-hi); transform:translateY(-2px);
-     box-shadow:0 6px 20px rgba(0,0,0,.28); }
+     box-shadow:0 8px 24px rgba(0,0,0,.33); }
   .kpi .v { font-size:31px; font-weight:650; line-height:1.05; letter-spacing:-1.2px; }
   .kpi .t { font-size:12px; color:var(--text2); margin-top:6px; font-weight:450; }
   .kpi.red .v{color:var(--red)} .kpi.orange .v{color:var(--amber)} .kpi.green .v{color:var(--green)}
@@ -96,13 +103,15 @@ CSS = """
   .kpi.red{border-top:2px solid var(--red)} .kpi.orange{border-top:2px solid var(--amber)}
   .kpi.green{border-top:2px solid var(--green)} .kpi.blue{border-top:2px solid var(--blue)}
   .kpi.gray{border-top:2px solid var(--gray)}
-  .chip { display:inline-block; background:var(--surface2); border:1px solid var(--border);
-     border-radius:8px; padding:5px 13px; margin:0 4px 6px 0; font-size:12.5px; color:var(--text2); }
+  .chip { display:inline-block; background:#1c2029; border:1px solid var(--border);
+     border-radius:9px; padding:5px 13px; margin:0 4px 6px 0; font-size:12.5px; color:var(--text2); }
   .chip b { color:var(--text); font-weight:600; }
   /* ---------- כרטיסים מתקפלים ---------- */
-  div[data-testid="stExpander"] { border:1px solid var(--border) !important; border-radius:12px !important;
-     background:var(--surface) !important; margin-bottom:8px; transition:border-color .15s; }
-  div[data-testid="stExpander"]:hover { border-color:var(--border-hi) !important; }
+  div[data-testid="stExpander"] { border:1px solid var(--border) !important; border-radius:13px !important;
+     background:linear-gradient(180deg,#181b24,#141620) !important; margin-bottom:8px;
+     transition:border-color .15s, box-shadow .15s; }
+  div[data-testid="stExpander"]:hover { border-color:var(--border-hi) !important;
+     box-shadow:0 4px 14px rgba(0,0,0,.26); }
   div[data-testid="stExpander"] summary { font-size:13.5px !important; padding:12px 16px !important;
      font-weight:500; }
   div[data-testid="stExpander"] summary:hover { color:var(--accent-hi) !important; }
@@ -114,12 +123,11 @@ CSS = """
   div[data-testid="stFileUploader"] { border:1.5px dashed var(--border-hi); border-radius:12px;
      padding:10px; background:var(--surface); }
   hr { border-color:var(--border); margin:16px 0; }
-  /* ---------- אכיפת רקע (לא תלוי ב-config.toml) ---------- */
   [data-testid="stAppViewContainer"] > .main { background:transparent !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
-PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="#0a0b0d", plot_bgcolor="#0a0b0d")
+PLOTLY_DARK = dict(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
 STATUS_BADGE = {"נשלח": "🟡 נשלח", "בטיפול": "🔵 בטיפול",
                 "טופל": "🟢 טופל", "לא רלוונטי": "⚪ לא רלוונטי"}
 
@@ -243,7 +251,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 20</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 21</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
