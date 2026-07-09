@@ -299,7 +299,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 37</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 38</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -447,20 +447,27 @@ if GQ and not f_all.empty:
             # מסלול-מייל מלא של הבקשה מהיומן — כל השליחות/מענים, בכל נמען (מחליפים כלולים)
             _trail = _req_trail(_req_raw)
             _sends = [e for e in _trail if "מענה" not in str(e.get("סוג", ""))]
-            # שלב א' — מייל שנשלח: הנמענים בפועל מהיומן מנצחים על האנליסט הנומינלי
-            # (אנליסט שעזב → המייל הופנה למנהל; מציגים את מי שקיבל בפועל, לא את מי שעזב)
-            if _sends:
-                _seen_r, _parts = set(), []
-                for _e in _sends:
-                    _w = str(_e.get("נמען", "") or "").split("@")[0].strip()
-                    if not _w or _w.lower() in _seen_r:
-                        continue
-                    _seen_r.add(_w.lower())
+            # רצף שליחות ייחודי-לפי-נמען (סדר: ① מייל ראשון למנהל ② שליחה חוזרת למחליף)
+            _send_seq, _seen_r = [], set()
+            for _e in _sends:
+                _w = str(_e.get("נמען", "") or "").split("@")[0].strip()
+                if not _w or _w.lower() in _seen_r:
+                    continue
+                _seen_r.add(_w.lower())
+                _send_seq.append((_w, str(_e.get("תאריך", "") or "")))
+            _has_sub = any(_w.lower() != _own_lp for _w, _ in _send_seq)
+            # שלב א' — נמענים בפועל מהיומן (מנצחים על האנליסט הנומינלי; לא מוחקים את שם האנליסט)
+            if _send_seq:
+                _nums = "①②③④⑤⑥⑦⑧"
+                _parts = []
+                for _i, (_w, _dt) in enumerate(_send_seq):
                     _is_sub = _w.lower() != _own_lp
                     _mk = " (מנהל/מחליף)" if _is_sub else ""
                     _cls = " class='xref-sub'" if _is_sub else ""
-                    _parts.append(f"<span{_cls}>{html.escape(_w)}{_mk}</span>")
-                _s1 = f"<div class='xref-step on'>📤 <b>נשלח בפועל ל:</b> {' · '.join(_parts)}</div>"
+                    _num = _nums[_i] if _i < len(_nums) else "•"
+                    _dtx = f" · {html.escape(_dt)}" if _dt else ""
+                    _parts.append(f"{_num} <span{_cls}>{html.escape(_w)}{_mk}</span>{_dtx}")
+                _s1 = f"<div class='xref-step on'>📤 <b>נשלח בפועל ל:</b> {' &nbsp; '.join(_parts)}</div>"
             elif _sent:
                 _s1 = (f"<div class='xref-step on'>📤 <b>מייל נשלח</b> {html.escape(_sent)} · "
                        f"אנליסט אחראי: {_an}</div>")
@@ -500,13 +507,17 @@ if GQ and not f_all.empty:
                             f"{html.escape('، '.join(_subs))}</span>" if _subs else "")
                 _s4 = (f"<div class='xref-trail'><b>📜 כל המיילים על הבקשה "
                        f"(כל נמען):</b>{_subline}{''.join(_rows_html)}</div>")
+            # שם האנליסט המקורי נשמר תמיד ליד הפריט (גם אם עזב); סימון-הפניה כשיש מחליף
+            _transfer = (" <span class='xref-sub'>(עזב — הפריט הופנה למנהל/מחליף)</span>"
+                         if _has_sub else "")
             _cards.append(
                 f"<div class='xref' style='border-right-color:{_col}'>"
                 f"<div class='xref-h'>📦 בקשה {_req} · שורה {_line} · "
                 f"<span class='mk'>מק\"ט {_mk}</span>"
                 f"<span class='xref-badge' style='background:{_col}22;color:{_col};"
                 f"border:1px solid {_col}55'>{_badge}</span></div>"
-                f"<div class='xref-d'>{_desc}{(' · ' + _typ) if _typ else ''}</div>"
+                f"<div class='xref-d'>{_desc}{(' · ' + _typ) if _typ else ''} · "
+                f"👤 אנליסט: {_an}{_transfer}</div>"
                 f"<div class='xref-flow'>{_s1}{_s2}{_s3}</div>{_s4}</div>")
         st.markdown("".join(_cards), unsafe_allow_html=True)
         if len(_hits) > 40:
