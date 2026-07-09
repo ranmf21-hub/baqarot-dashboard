@@ -299,7 +299,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 36</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 37</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -443,10 +443,27 @@ if GQ and not f_all.empty:
             _mk = html.escape(str(r.get("מקט", "") or "—"))
             _desc = html.escape(str(r.get("תיאור", "") or "").strip()) or "—"
             _typ = html.escape(str(r.get("סוג ממצא", "") or ""))
-            # שלב א' — מייל שנשלח
-            if _sent:
-                _s1 = (f"<div class='xref-step on'>📤 <b>מייל נשלח</b> {html.escape(_sent)} "
-                       f"→ {_an} · תקופה {_per}</div>")
+            _own_lp = str(r.get("אנליסט", "") or "").split("@")[0].strip().lower()
+            # מסלול-מייל מלא של הבקשה מהיומן — כל השליחות/מענים, בכל נמען (מחליפים כלולים)
+            _trail = _req_trail(_req_raw)
+            _sends = [e for e in _trail if "מענה" not in str(e.get("סוג", ""))]
+            # שלב א' — מייל שנשלח: הנמענים בפועל מהיומן מנצחים על האנליסט הנומינלי
+            # (אנליסט שעזב → המייל הופנה למנהל; מציגים את מי שקיבל בפועל, לא את מי שעזב)
+            if _sends:
+                _seen_r, _parts = set(), []
+                for _e in _sends:
+                    _w = str(_e.get("נמען", "") or "").split("@")[0].strip()
+                    if not _w or _w.lower() in _seen_r:
+                        continue
+                    _seen_r.add(_w.lower())
+                    _is_sub = _w.lower() != _own_lp
+                    _mk = " (מנהל/מחליף)" if _is_sub else ""
+                    _cls = " class='xref-sub'" if _is_sub else ""
+                    _parts.append(f"<span{_cls}>{html.escape(_w)}{_mk}</span>")
+                _s1 = f"<div class='xref-step on'>📤 <b>נשלח בפועל ל:</b> {' · '.join(_parts)}</div>"
+            elif _sent:
+                _s1 = (f"<div class='xref-step on'>📤 <b>מייל נשלח</b> {html.escape(_sent)} · "
+                       f"אנליסט אחראי: {_an}</div>")
             else:
                 _s1 = "<div class='xref-step wait'>📤 טרם נשלח מייל על הפריט</div>"
             # שלב ב' — תשובה שהתקבלה (הגוף = אחרי 'תשובה:' האחרון; ⚠ = דרוש אימות)
@@ -462,8 +479,7 @@ if GQ and not f_all.empty:
                 _s2 = "<div class='xref-step wait'>📩 ממתין לתשובת האנליסט</div>"
             # שלב ג' — סטטוס נוכחי
             _s3 = f"<div class='xref-step on'>🏁 <b>סטטוס נוכחי:</b> {_badge}</div>"
-            # מסלול-מייל מלא: כל השליחות/מענים על הבקשה מהיומן — בכל נמען (מחליפים כלולים)
-            _trail = _req_trail(_req_raw)
+            # שלב ד' — יומן מלא כרונולוגי: כל השליחות/מענים על הבקשה, בכל נמען
             _s4 = ""
             if _trail:
                 _own = str(r.get("אנליסט", "") or "").split("@")[0].strip().lower()
