@@ -77,6 +77,7 @@ CSS = """
   .xref-trail b { color:var(--text); }
   .xref-trail-row { padding:1px 0; color:#b9c0cc; }
   .xref-sub { color:#e0a94b; font-weight:600; }
+  .xref-subj { color:#7f8795; font-style:italic; }
   /* ---------- סרגל צד ---------- */
   section[data-testid="stSidebar"] { direction:rtl; border-left:1px solid var(--border);
      background:linear-gradient(180deg,#101320,#0c0e14) !important; }
@@ -299,7 +300,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 38</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 39</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -501,8 +502,12 @@ if GQ and not f_all.empty:
                         _subs.append(_who)
                     _whoh = (f"<span class='xref-sub'>{html.escape(_who)}</span>"
                              if _is_sub else html.escape(_who or "—"))
+                    # נושא המייל — כדי לאתר/לגשת למייל עצמו ב-Outlook (קישור מעשי)
+                    _subj2 = str(_sr.get("נושא", "") or "").strip()
+                    _subjh = (f" · <span class='xref-subj'>«{html.escape(_subj2[:48])}»</span>"
+                              if _subj2 else "")
                     _rows_html.append(f"<div class='xref-trail-row'>{_ico} {_dt} · "
-                                      f"→ {_whoh} · {html.escape(_typ2)}</div>")
+                                      f"→ {_whoh} · {html.escape(_typ2)}{_subjh}</div>")
                 _subline = (f" <span class='xref-sub'>· נשלח גם למחליפים: "
                             f"{html.escape('، '.join(_subs))}</span>" if _subs else "")
                 _s4 = (f"<div class='xref-trail'><b>📜 כל המיילים על הבקשה "
