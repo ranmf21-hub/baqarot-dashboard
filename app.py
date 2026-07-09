@@ -57,6 +57,12 @@ CSS = """
   /* ---------- סרגל צד ---------- */
   section[data-testid="stSidebar"] { direction:rtl; border-left:1px solid var(--border);
      background:linear-gradient(180deg,#101320,#0c0e14) !important; }
+  /* כיווץ סרגל-הצד (RTL) — הסתרה מלאה, בלי פס-שארית לא-נוח */
+  section[data-testid="stSidebar"][aria-expanded="false"] {
+     width:0 !important; min-width:0 !important; max-width:0 !important;
+     margin:0 !important; padding:0 !important; border:none !important;
+     background:transparent !important; overflow:hidden !important; transform:none !important; }
+  section[data-testid="stSidebar"][aria-expanded="false"] * { visibility:hidden !important; }
   /* ---------- כפתורים — מסגרת ברורה + עומק לכל כפתור ---------- */
   .stButton>button, .stDownloadButton>button, div[data-testid="stPopover"]>button {
      background:linear-gradient(180deg,#242835,#1b1f29) !important;
@@ -270,7 +276,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 31</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 32</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
