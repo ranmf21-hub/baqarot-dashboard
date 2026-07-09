@@ -276,7 +276,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 32</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 33</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -359,6 +359,43 @@ st.markdown(
     f"<div class='hstat late'><span class='hv'>{_h_late}</span><span class='hl'>באיחור</span></div>"
     "</div></div>", unsafe_allow_html=True)
 
+# ---------------------------------------------------------------- חיפוש-על (מאחד את כל הלשוניות)
+# חוליה-מקשרת: מזהה/בקשה/מק"ט. חיפוש אחד שגם 'לפי תקופה' וגם 'שליחת מיילים' מכבדים.
+GQ = st.text_input("חיפוש-על", "", label_visibility="collapsed",
+                   placeholder="🔎 חיפוש-על: מספר בקשה · מק\"ט · תיאור · מזהה · אנליסט — מצליב ומסנן את כל הלשוניות",
+                   key="global_search").strip()
+
+
+def _match(df, term):
+    """סינון פריטים לפי מונח חופשי — על פני בקשה/שורה/מק\"ט/תיאור/מזהה/אנליסט/תשובה."""
+    if df.empty or not term:
+        return df
+    hay = (df["מספר בקשה"].astype(str) + " ¦ " + df["שורה"].astype(str) + " ¦ "
+           + df["מקט"].astype(str) + " ¦ " + df["תיאור"].astype(str) + " ¦ "
+           + df["מזהה"].astype(str) + " ¦ " + df["אנליסט"].astype(str) + " ¦ "
+           + df["הערה"].astype(str))
+    return df[hay.str.contains(term, case=False, na=False, regex=False)]
+
+
+if GQ and not f_all.empty:
+    _hits = _match(f_all, GQ)
+    if _hits.empty:
+        st.warning(f"🔎 אין תוצאות ל־\"{GQ}\".")
+    else:
+        st.markdown(
+            f"<div class='note'>🔎 <b>{len(_hits)}</b> פריטים תואמים ל־\"{GQ}\" · "
+            f"{_hits['אנליסט'].nunique()} אנליסטים · {_hits['תקופת בקרה'].nunique()} תקופות — "
+            f"טבלת-הצלבה (הלשוניות למטה מסוננות גם הן):</div>", unsafe_allow_html=True)
+        _xref = _hits.copy()
+        _xref["מצב"] = _xref["סטטוס"].map(STATUS_BADGE).fillna(_xref["סטטוס"])
+        _xref["תשובה"] = (_xref["הערה"].astype(str)
+                          .str.replace(r".*תשובה:\s*", "", regex=True).str.strip())
+        _cols = ["מצב", "מספר בקשה", "שורה", "מקט", "תיאור", "סוג ממצא", "אנליסט",
+                 "תקופת בקרה", "נשלח בתאריך", "חיווי בתאריך", "תשובה", "מזהה"]
+        st.dataframe(_xref[_cols], use_container_width=True, hide_index=True,
+                     height=min(430, 70 + 36 * len(_xref)))
+    st.markdown("---")
+
 # ---------------------------------------------------------------- טאבים
 # 'לפי תקופה' ראשון — זו מסך העבודה היומיומי; 'סקירה' (תמונת-על כוללת) משנית.
 
@@ -374,10 +411,17 @@ with tab_period:
         st.info("המאגר ריק — גרור ריצה ראשונה בטאב 'קליטה בגרירה'.")
     else:
         periods = sorted(f_all["תקופת בקרה"].unique(), reverse=True)
+        if GQ:   # חיפוש פעיל — הבא קדימה את התקופות עם ההתאמות
+            _mp = _match(f_all, GQ)["תקופת בקרה"].value_counts()
+            periods = sorted(periods, key=lambda p: int(_mp.get(p, 0)), reverse=True)
         sel = st.selectbox("תקופת בקרה", periods)
         g = f_all[f_all["תקופת בקרה"] == sel]
         side = g[g["סוג ממצא"].isin(core.SIDE_TYPES)]
         act = g[~g["סוג ממצא"].isin(core.SIDE_TYPES)]   # ממצאים לטיפול בפועל
+        if GQ:   # סינון לפי חיפוש-העל
+            act, side = _match(act, GQ), _match(side, GQ)
+            if act.empty:
+                st.info(f"אין פריטים תואמים ל־\"{GQ}\" בתקופה זו — ראה טבלת-ההצלבה למעלה או החלף תקופה.")
 
         # --- שלב 1: איפה התהליך עומד — פס-התקדמות לפי שלבי התהליך ---
         n_wait = int((act["סטטוס"] == "נשלח").sum())
@@ -799,12 +843,11 @@ with tab_ship:
         if n_late:
             st.caption(f"🔴 שים לב: {n_late} פריטים באיחור (מעל סף התזכורת).")
 
-        # מסננים משניים: אנליסט + חיפוש חופשי
-        fc1, fc2 = st.columns([1, 2])
+        # מסנן-משנה: אנליסט. (החיפוש החופשי = חיפוש-העל שבראש העמוד, מאחד את שתי הלשוניות)
         _ans = ["(כל האנליסטים)"] + sorted([a for a in A["אנליסט"].dropna().unique() if str(a).strip()])
-        pick_an = fc1.selectbox("אנליסט", _ans, label_visibility="collapsed")
-        q = fc2.text_input("חיפוש", "", label_visibility="collapsed",
-                           placeholder="🔎 חיפוש: מקט / תיאור / מספר בקשה / טקסט התשובה")
+        pick_an = st.selectbox("אנליסט", _ans, label_visibility="collapsed")
+        if GQ:
+            st.caption(f"🔎 מסונן לפי חיפוש-העל: \"{GQ}\"")
 
         V = A
         if mode == "review":
@@ -817,10 +860,8 @@ with tab_ship:
             V = V[V["סטטוס"] == "טופל"]
         if pick_an != "(כל האנליסטים)":
             V = V[V["אנליסט"] == pick_an]
-        if q.strip():
-            _hay = (V["מקט"].astype(str) + " " + V["תיאור"].astype(str) + " "
-                    + V["מספר בקשה"].astype(str) + " " + V["הערה"].astype(str))
-            V = V[_hay.str.contains(q.strip(), case=False, na=False, regex=False)]
+        if GQ:
+            V = _match(V, GQ)
 
         if V.empty:
             st.info("אין פריטים בסינון הזה — נסה 'הכל' או סינון אחר.")
