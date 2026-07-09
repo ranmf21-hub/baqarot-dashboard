@@ -7,6 +7,7 @@
 """
 import os
 import json
+import html
 import datetime as dt
 
 import pandas as pd
@@ -54,6 +55,23 @@ CSS = """
   h3 { font-size:16px !important; font-weight:600 !important; letter-spacing:-0.2px; color:var(--text); }
   .note { color:var(--text2); font-size:12.5px; line-height:1.6; }
   a { color:var(--accent-hi); text-decoration:none; } a:hover { text-decoration:underline; }
+  /* ---------- כרטיס-סיפור לפריט (תוצאת חיפוש-על) ---------- */
+  .xref { background:linear-gradient(180deg,var(--surface2),var(--surface));
+     border:1px solid var(--border); border-right:4px solid var(--accent);
+     border-radius:13px; padding:13px 17px 14px; margin:10px 0; box-shadow:var(--shadow); }
+  .xref-h { font-size:15px; font-weight:600; color:var(--text); display:flex;
+     align-items:center; gap:8px; flex-wrap:wrap; }
+  .xref-h .mk { color:var(--accent-hi); font-weight:700; }
+  .xref-badge { margin-inline-start:auto; font-size:11.5px; padding:3px 12px;
+     border-radius:20px; font-weight:600; white-space:nowrap; }
+  .xref-d { font-size:12.5px; color:var(--text2); margin:5px 0 11px; line-height:1.5; }
+  .xref-flow { display:flex; flex-direction:column; gap:7px; }
+  .xref-step { font-size:13px; color:#cfd4de; padding:8px 13px; background:#0f1420;
+     border-radius:9px; border-right:3px solid var(--border-hi); line-height:1.5; }
+  .xref-step.on { border-right-color:var(--accent); }
+  .xref-step.wait { color:var(--text3); }
+  .xref-step b { color:var(--text); font-weight:600; }
+  .xref-reply { color:#d8dde6; font-style:normal; }
   /* ---------- סרגל צד ---------- */
   section[data-testid="stSidebar"] { direction:rtl; border-left:1px solid var(--border);
      background:linear-gradient(180deg,#101320,#0c0e14) !important; }
@@ -276,7 +294,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 34</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 35</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -383,17 +401,58 @@ if GQ and not f_all.empty:
         st.warning(f"🔎 אין תוצאות ל־\"{GQ}\".")
     else:
         st.markdown(
-            f"<div class='note'>🔎 <b>{len(_hits)}</b> פריטים תואמים ל־\"{GQ}\" · "
+            f"<div class='note'>🔎 <b>{len(_hits)}</b> פריטים תואמים ל־\"{html.escape(GQ)}\" · "
             f"{_hits['אנליסט'].nunique()} אנליסטים · {_hits['תקופת בקרה'].nunique()} תקופות — "
-            f"טבלת-הצלבה (הלשוניות למטה מסוננות גם הן):</div>", unsafe_allow_html=True)
-        _xref = _hits.copy()
-        _xref["מצב"] = _xref["סטטוס"].map(STATUS_BADGE).fillna(_xref["סטטוס"])
-        _xref["תשובה"] = (_xref["הערה"].astype(str)
-                          .str.replace(r".*תשובה:\s*", "", regex=True).str.strip())
-        _cols = ["מצב", "מספר בקשה", "שורה", "מקט", "תיאור", "סוג ממצא", "אנליסט",
-                 "תקופת בקרה", "נשלח בתאריך", "חיווי בתאריך", "תשובה", "מזהה"]
-        st.dataframe(_xref[_cols], use_container_width=True, hide_index=True,
-                     height=min(430, 70 + 36 * len(_xref)))
+            f"כל פריט וכל מסלולו (מייל → תשובה → סטטוס). הלשוניות למטה מסוננות גם הן:</div>",
+            unsafe_allow_html=True)
+        # כרטיס-סיפור לכל פריט: הפריט → המייל שנשלח → התשובה שהתקבלה → הסטטוס הנוכחי.
+        _cards = []
+        for _, r in _hits.head(40).iterrows():
+            _stt = str(r.get("סטטוס", "") or "")
+            _col = core.STATUS_COLORS.get(_stt, "#6b7484")
+            _badge = STATUS_BADGE.get(_stt, _stt)
+            _an = html.escape(str(r.get("אנליסט", "") or "—"))
+            _per = html.escape(str(r.get("תקופת בקרה", "") or ""))
+            _sent = str(r.get("נשלח בתאריך", "") or "").strip()
+            _rdate = str(r.get("חיווי בתאריך", "") or "").strip()
+            _note = str(r.get("הערה", "") or "")
+            _src = str(r.get("מקור חיווי", "") or "")
+            _req = html.escape(str(r.get("מספר בקשה", "") or ""))
+            _line = html.escape(str(r.get("שורה", "") or ""))
+            _mk = html.escape(str(r.get("מקט", "") or "—"))
+            _desc = html.escape(str(r.get("תיאור", "") or "").strip()) or "—"
+            _typ = html.escape(str(r.get("סוג ממצא", "") or ""))
+            # שלב א' — מייל שנשלח
+            if _sent:
+                _s1 = (f"<div class='xref-step on'>📤 <b>מייל נשלח</b> {html.escape(_sent)} "
+                       f"→ {_an} · תקופה {_per}</div>")
+            else:
+                _s1 = "<div class='xref-step wait'>📤 טרם נשלח מייל על הפריט</div>"
+            # שלב ב' — תשובה שהתקבלה (הגוף = אחרי 'תשובה:' האחרון; ⚠ = דרוש אימות)
+            _rtxt = _note.rsplit("תשובה:", 1)[1].strip() if "תשובה:" in _note else ""
+            _replied = ("תשובה:" in _note) or ("מייל" in _src)
+            if _replied:
+                _lbl = "דרוש אימות" if "⚠" in _note else "תשובה התקבלה"
+                _when = f" {html.escape(_rdate)}" if _rdate else ""
+                _body = (f" <span class='xref-reply'>“{html.escape(_rtxt[:220])}”</span>"
+                         if _rtxt else "")
+                _s2 = f"<div class='xref-step on'>📩 <b>{_lbl}</b>{_when}{_body}</div>"
+            else:
+                _s2 = "<div class='xref-step wait'>📩 ממתין לתשובת האנליסט</div>"
+            # שלב ג' — סטטוס נוכחי
+            _s3 = f"<div class='xref-step on'>🏁 <b>סטטוס נוכחי:</b> {_badge}</div>"
+            _cards.append(
+                f"<div class='xref' style='border-right-color:{_col}'>"
+                f"<div class='xref-h'>📦 בקשה {_req} · שורה {_line} · "
+                f"<span class='mk'>מק\"ט {_mk}</span>"
+                f"<span class='xref-badge' style='background:{_col}22;color:{_col};"
+                f"border:1px solid {_col}55'>{_badge}</span></div>"
+                f"<div class='xref-d'>{_desc}{(' · ' + _typ) if _typ else ''}</div>"
+                f"<div class='xref-flow'>{_s1}{_s2}{_s3}</div></div>")
+        st.markdown("".join(_cards), unsafe_allow_html=True)
+        if len(_hits) > 40:
+            st.caption(f"מוצגים 40 מתוך {len(_hits)} — צמצם את החיפוש "
+                       f"(הוסף מספר-שורה או מילה מהתיאור).")
     st.markdown("---")
 
 # ---------------------------------------------------------------- טאבים
