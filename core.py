@@ -663,6 +663,8 @@ _Q_WORDS = ['?', 'מדוע', 'למה', 'כיצד', 'לא ברור', 'לא ברו
 _NEGATORS = ['לא ', 'אין ', 'אינו', 'איננו', 'אינה', 'טרם ', 'עדיין ', 'בלי ', 'ללא ', 'בלתי', 'לא ניתן', 'אי אפשר']
 _CUT_MARKERS = ['-----Original Message-----', '-----הודעה מקורית-----', '____________________', 'מאת:', 'From:', 'נשלח:', 'Sent:', 'שלח:', 'צוות בקרת הקטלוג', 'בברכה', 'בכבוד רב', 'בכבוד', 'http', 'www', 'נשלח מ']
 _TAG_RE = re.compile(r"\[#(\d+)-(\d+)\]")
+# מספר-בקשה חופשי ("בקשה 46313") — קישור לפי הבקשה ולא לפי הנמען (מחליף/אנליסט שעזב)
+_REQ_RE = re.compile(r"בקשה[^\d]{0,8}(\d{4,6})")
 
 
 def _extract_new_body(b):
@@ -715,6 +717,17 @@ def reply_tags(text):
     return out
 
 
+def reply_reqs(*texts):
+    """מספרי-בקשה חופשיים ("בקשה 46313") מהכותרת+גוף — ייחודי. משמש לקישור מייל
+    שנשלח למחליף/אנליסט שעזב, לפי הבקשה עצמה ולא לפי הנמען."""
+    out = []
+    for t in texts:
+        for req in _REQ_RE.findall(str(t or "")):
+            if req not in out:
+                out.append(req)
+    return out
+
+
 def apply_mail(led: dict, mail: dict) -> dict:
     """מייל שנגרר: משלוח -> ווידוא תאריך-שליחה לממצאי הנמען; מענה -> 'בטיפול' (לאימות).
     בטיחות: בלי נמען/שולח מזוהה — לא מעדכנים כלום (רק נרשם ביומן)."""
@@ -723,14 +736,18 @@ def apply_mail(led: dict, mail: dict) -> dict:
     touched, note = 0, ""
     if mail["mail_type"] == "משלוח":
         rcpts = re.findall(r"[\w.\-]+@[\w.\-]+", str(mail.get("to", "")).lower())
-        if not rcpts:
-            note = "לא זוהו כתובות נמען במייל — לא עודכנו ממצאים"
+        reqs = set(reply_reqs(mail.get("subject", ""), mail.get("body", "")))
+        if not rcpts and not reqs:
+            note = "לא זוהו כתובות נמען/מספר-בקשה במייל — לא עודכנו ממצאים"
         else:
             for i in f.index:
-                if period and f.at[i, "תקופת בקרה"] != period:
-                    continue
-                if not any(_match_recipient(f.at[i, "נמען"], f.at[i, "אנליסט"], a) for a in rcpts):
-                    continue
+                # קישור לפי מספר-בקשה (בכל נמען — מחליף/אנליסט שעזב); אחרת לפי נמען+תקופה
+                by_req = str(f.at[i, "מספר בקשה"]).strip() in reqs
+                if not by_req:
+                    if period and f.at[i, "תקופת בקרה"] != period:
+                        continue
+                    if not any(_match_recipient(f.at[i, "נמען"], f.at[i, "אנליסט"], a) for a in rcpts):
+                        continue
                 # משלוח מאשר את השליחה — משלים תאריך-שליחה אם חסר (הסטטוס כבר 'נשלח')
                 if not f.at[i, "נשלח בתאריך"]:
                     f.at[i, "נשלח בתאריך"] = when
@@ -744,16 +761,21 @@ def apply_mail(led: dict, mail: dict) -> dict:
         decision = classify_reply(body_new)
         tags = reply_tags(mail.get("body", ""))
         tagset = {(r, l) for r, l in tags}
-        if not snds and not tags:
-            note = "לא זוהתה כתובת השולח/תגית — לא עודכנו ממצאים (סמן ידנית בטבלה)"
+        # מספרי-בקשה חופשיים (רק כשאין תגיות) — קישור לפי הבקשה, בכל שולח (מחליף/אנליסט שעזב)
+        reqs = set() if tags else set(reply_reqs(mail.get("subject", ""), mail.get("body", "")))
+        if not snds and not tags and not reqs:
+            note = "לא זוהתה כתובת השולח/תגית/מספר-בקשה — לא עודכנו ממצאים (סמן ידנית בטבלה)"
         else:
             snd = snds[0] if snds else ""
-            multi = (len(tags) != 1)          # בולק/תקופה => לא סוגרים אוטומטית פר-פריט
+            # רק תגית-בודדת סוגרת אוטומטית; בולק/מספר-בקשה/תקופה => לא סוגרים פר-פריט
+            multi = (len(tags) != 1)
             _map = {"DONE": "טופל", "NA": "בטיפול", "WIP": "בטיפול", "ASK": "בטיפול"}
             for i in f.index:
                 if tags:
                     hit = (str(f.at[i, "מספר בקשה"]).strip(),
                            str(f.at[i, "שורה"]).strip()) in tagset
+                elif reqs:
+                    hit = str(f.at[i, "מספר בקשה"]).strip() in reqs   # לפי מספר-בקשה, בכל נמען
                 else:
                     hit = (bool(snd)
                            and _match_recipient(f.at[i, "נמען"], f.at[i, "אנליסט"], snd)

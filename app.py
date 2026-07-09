@@ -72,6 +72,11 @@ CSS = """
   .xref-step.wait { color:var(--text3); }
   .xref-step b { color:var(--text); font-weight:600; }
   .xref-reply { color:#d8dde6; font-style:normal; }
+  .xref-trail { margin-top:7px; padding:8px 13px; background:#0f1420; border-radius:9px;
+     border-right:3px solid #b98a3a; font-size:12.5px; color:#cfd4de; line-height:1.6; }
+  .xref-trail b { color:var(--text); }
+  .xref-trail-row { padding:1px 0; color:#b9c0cc; }
+  .xref-sub { color:#e0a94b; font-weight:600; }
   /* ---------- סרגל צד ---------- */
   section[data-testid="stSidebar"] { direction:rtl; border-left:1px solid var(--border);
      background:linear-gradient(180deg,#101320,#0c0e14) !important; }
@@ -294,7 +299,7 @@ with st.sidebar:
     st.markdown("## 🎛️ לוח בקרת קטלוג")
     st.markdown("<div style='display:inline-block;background:#5e6ad2;color:#fff;font-size:11px;"
                 "font-weight:600;padding:2px 10px;border-radius:6px;margin:2px 0 6px'>"
-                "עיצוב Linear · גרסה 35</div>", unsafe_allow_html=True)
+                "עיצוב Linear · גרסה 36</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='note'>מאגר: {st.session_state.led_src or 'חדש (לא נשמר עדיין)'}</div>",
                 unsafe_allow_html=True)
     if st.session_state.get("led_err"):
@@ -405,6 +410,21 @@ if GQ and not f_all.empty:
             f"{_hits['אנליסט'].nunique()} אנליסטים · {_hits['תקופת בקרה'].nunique()} תקופות — "
             f"כל פריט וכל מסלולו (מייל → תשובה → סטטוס). הלשוניות למטה מסוננות גם הן:</div>",
             unsafe_allow_html=True)
+        # מסלול-מייל מלא של בקשה מהיומן — כל השליחות/מענים, בכל נמען (כולל מחליפים).
+        _ship_all = led.get("shipments")
+        import re as _re_trail
+        def _req_trail(req_raw):
+            req_raw = str(req_raw or "").strip()
+            if _ship_all is None or _ship_all.empty or not req_raw:
+                return []
+            pat = _re_trail.compile(r"בקשה\s*" + _re_trail.escape(req_raw) + r"(?!\d)")
+            rows = []
+            for _, sr in _ship_all.iterrows():
+                det, subj = str(sr.get("פרטים", "")), str(sr.get("נושא", ""))
+                if pat.search(det) or pat.search(subj) or ("[#" + req_raw + "-") in (det + subj):
+                    rows.append(sr)
+            return rows
+
         # כרטיס-סיפור לכל פריט: הפריט → המייל שנשלח → התשובה שהתקבלה → הסטטוס הנוכחי.
         _cards = []
         for _, r in _hits.head(40).iterrows():
@@ -417,7 +437,8 @@ if GQ and not f_all.empty:
             _rdate = str(r.get("חיווי בתאריך", "") or "").strip()
             _note = str(r.get("הערה", "") or "")
             _src = str(r.get("מקור חיווי", "") or "")
-            _req = html.escape(str(r.get("מספר בקשה", "") or ""))
+            _req_raw = str(r.get("מספר בקשה", "") or "").strip()
+            _req = html.escape(_req_raw)
             _line = html.escape(str(r.get("שורה", "") or ""))
             _mk = html.escape(str(r.get("מקט", "") or "—"))
             _desc = html.escape(str(r.get("תיאור", "") or "").strip()) or "—"
@@ -441,6 +462,28 @@ if GQ and not f_all.empty:
                 _s2 = "<div class='xref-step wait'>📩 ממתין לתשובת האנליסט</div>"
             # שלב ג' — סטטוס נוכחי
             _s3 = f"<div class='xref-step on'>🏁 <b>סטטוס נוכחי:</b> {_badge}</div>"
+            # מסלול-מייל מלא: כל השליחות/מענים על הבקשה מהיומן — בכל נמען (מחליפים כלולים)
+            _trail = _req_trail(_req_raw)
+            _s4 = ""
+            if _trail:
+                _own = str(r.get("אנליסט", "") or "").split("@")[0].strip().lower()
+                _rows_html, _subs = [], []
+                for _sr in _trail[:8]:
+                    _typ2 = str(_sr.get("סוג", "") or "")
+                    _ico = "📩" if "מענה" in _typ2 else "📤"
+                    _who = str(_sr.get("נמען", "") or "").split("@")[0].strip()
+                    _dt = html.escape(str(_sr.get("תאריך", "") or ""))
+                    _is_sub = _who and _who.lower() != _own
+                    if _is_sub and _who not in _subs:
+                        _subs.append(_who)
+                    _whoh = (f"<span class='xref-sub'>{html.escape(_who)}</span>"
+                             if _is_sub else html.escape(_who or "—"))
+                    _rows_html.append(f"<div class='xref-trail-row'>{_ico} {_dt} · "
+                                      f"→ {_whoh} · {html.escape(_typ2)}</div>")
+                _subline = (f" <span class='xref-sub'>· נשלח גם למחליפים: "
+                            f"{html.escape('، '.join(_subs))}</span>" if _subs else "")
+                _s4 = (f"<div class='xref-trail'><b>📜 כל המיילים על הבקשה "
+                       f"(כל נמען):</b>{_subline}{''.join(_rows_html)}</div>")
             _cards.append(
                 f"<div class='xref' style='border-right-color:{_col}'>"
                 f"<div class='xref-h'>📦 בקשה {_req} · שורה {_line} · "
@@ -448,7 +491,7 @@ if GQ and not f_all.empty:
                 f"<span class='xref-badge' style='background:{_col}22;color:{_col};"
                 f"border:1px solid {_col}55'>{_badge}</span></div>"
                 f"<div class='xref-d'>{_desc}{(' · ' + _typ) if _typ else ''}</div>"
-                f"<div class='xref-flow'>{_s1}{_s2}{_s3}</div></div>")
+                f"<div class='xref-flow'>{_s1}{_s2}{_s3}</div>{_s4}</div>")
         st.markdown("".join(_cards), unsafe_allow_html=True)
         if len(_hits) > 40:
             st.caption(f"מוצגים 40 מתוך {len(_hits)} — צמצם את החיפוש "
